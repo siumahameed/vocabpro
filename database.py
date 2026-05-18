@@ -209,16 +209,23 @@ def init_db():
                 )
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_time ON chat_messages(user_id, created_at)")
-        # Fix: ensure id column has proper serial sequence
+        # Fix: check if id column works, if not recreate table
         if USE_POSTGRES:
             try:
-                # Fix null ids by assigning from sequence
-                cursor.execute("SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE((SELECT MAX(id) FROM users), 0) + 1, false)")
-                cursor.execute("UPDATE users SET id = nextval(pg_get_serial_sequence('users', 'id')) WHERE id IS NULL")
-                conn.commit()
-                print("Fixed null user IDs")
+                cursor.execute("SELECT id FROM users LIMIT 1")
+                test_row = cursor.fetchone()
+                if test_row and test_row[0] is None:
+                    print("Detected broken id column, recreating users table...")
+                    cursor.execute("DROP TABLE IF EXISTS chat_messages CASCADE")
+                    cursor.execute("DROP TABLE IF EXISTS payments CASCADE")
+                    cursor.execute("DROP TABLE IF EXISTS contest_participations CASCADE")
+                    cursor.execute("DROP TABLE IF EXISTS contests CASCADE")
+                    cursor.execute("DROP TABLE IF EXISTS vocabulary CASCADE")
+                    cursor.execute("DROP TABLE IF EXISTS users CASCADE")
+                    conn.commit()
+                    print("Tables dropped. Restart to recreate.")
             except Exception as fix_err:
-                print(f"ID fix note: {fix_err}")
+                print(f"ID check note: {fix_err}")
                 conn.rollback()
         conn.commit()
     except Exception as e:
