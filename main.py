@@ -27,7 +27,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import uvicorn
 from jinja2 import Environment, FileSystemLoader
 
-SECRET_KEY = "vocabpro-secret-key-change-in-production"
+SECRET_KEY = os.environ.get("SESSION_SECRET_KEY", "vocabpro-secret-key-change-in-production")
 
 # Jinja2 environment for rendering templates
 jinja_env = Environment(loader=FileSystemLoader("templates"), autoescape=True)
@@ -79,7 +79,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="VocabPro", lifespan=lifespan)
 
 # Session middleware
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    cookie_name="vocabpro_session",
+    cookie_secure=True,
+    cookie_httponly=True,
+    cookie_samesite="lax"
+)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
