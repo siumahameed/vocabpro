@@ -41,6 +41,7 @@ def get_db_connection():
                 user=DB_USER,
                 password=DB_PASSWORD
             )
+            conn.cursor_factory = RealDictCursor
             return conn
         except Exception as e:
             print(f"PostgreSQL connection error: {e}")
