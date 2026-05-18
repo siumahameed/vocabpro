@@ -198,7 +198,9 @@ async def dashboard(request: Request, user: dict = Depends(require_auth)):
     """User Dashboard"""
     days_left = 0
     if user.get("trial_ends"):
-        trial_end = datetime.strptime(user["trial_ends"], "%Y-%m-%d").date()
+        trial_end = user["trial_ends"]
+        if isinstance(trial_end, str):
+            trial_end = datetime.strptime(trial_end, "%Y-%m-%d").date()
         days_left = (trial_end - datetime.now().date()).days
     html = render_page("dashboard.html", {"request": request, "seo_title": "Dashboard - VocabPro", "seo_description": SEO_CONFIG["description"], "user": user, "days_left": max(0, days_left)})
     return HTMLResponse(content=html)
