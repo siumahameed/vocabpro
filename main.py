@@ -490,7 +490,7 @@ async def login(user: UserLogin, request: Request):
     # Set session
     request.session["user_id"] = verified_user["id"]
 
-    return {"status": "success", "message": "Login successful", "redirect": "/dashboard", "debug_user_id": verified_user.get("id"), "debug_keys": list(verified_user.keys())[:5]}
+    return {"status": "success", "message": "Login successful", "redirect": "/dashboard"}
 
 @app.post("/api/submit-payment")
 async def submit_payment(payment: PaymentSubmit, user: dict = Depends(require_auth)):

@@ -209,6 +209,17 @@ def init_db():
                 )
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_time ON chat_messages(user_id, created_at)")
+        # Fix: ensure id column has proper serial sequence
+        if USE_POSTGRES:
+            try:
+                # Fix null ids by assigning from sequence
+                cursor.execute("SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE((SELECT MAX(id) FROM users), 0) + 1, false)")
+                cursor.execute("UPDATE users SET id = nextval(pg_get_serial_sequence('users', 'id')) WHERE id IS NULL")
+                conn.commit()
+                print("Fixed null user IDs")
+            except Exception as fix_err:
+                print(f"ID fix note: {fix_err}")
+                conn.rollback()
         conn.commit()
     except Exception as e:
         print(f"Migration note: {e}")
