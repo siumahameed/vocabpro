@@ -209,23 +209,25 @@ def init_db():
                 )
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_time ON chat_messages(user_id, created_at)")
-        # Fix: check if id column works, if not recreate table
+        # Fix: ensure users id column is SERIAL with working sequence
         if USE_POSTGRES:
             try:
-                cursor.execute("SELECT id FROM users LIMIT 1")
-                test_row = cursor.fetchone()
-                if test_row and test_row[0] is None:
-                    print("Detected broken id column, recreating users table...")
-                    cursor.execute("DROP TABLE IF EXISTS chat_messages CASCADE")
-                    cursor.execute("DROP TABLE IF EXISTS payments CASCADE")
-                    cursor.execute("DROP TABLE IF EXISTS contest_participations CASCADE")
-                    cursor.execute("DROP TABLE IF EXISTS contests CASCADE")
-                    cursor.execute("DROP TABLE IF EXISTS vocabulary CASCADE")
-                    cursor.execute("DROP TABLE IF EXISTS users CASCADE")
+                # Check if sequence exists for users.id
+                cursor.execute("SELECT pg_get_serial_sequence('users', 'id')")
+                seq = cursor.fetchone()
+                if not seq or not seq[0]:
+                    print("No sequence for users.id, adding one...")
+                    cursor.execute("CREATE SEQUENCE IF NOT EXISTS users_id_seq OWNED BY users.id")
+                    cursor.execute("ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq')")
+                    cursor.execute("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 0))")
                     conn.commit()
-                    print("Tables dropped. Restart to recreate.")
+                    print("Fixed users.id sequence")
+
+                # Fix any null ids
+                cursor.execute("UPDATE users SET id = nextval('users_id_seq') WHERE id IS NULL")
+                conn.commit()
             except Exception as fix_err:
-                print(f"ID check note: {fix_err}")
+                print(f"ID fix note: {fix_err}")
                 conn.rollback()
         conn.commit()
     except Exception as e:
