@@ -575,12 +575,12 @@
                 </div>
                 <div>
                     <p class="text-sm text-gray-500">Member Since</p>
-                    <p class="font-medium text-gray-900">{{ user.created_at[:10] }}</p>
+                    <p class="font-medium text-gray-900">{{ user.created_at|string|truncate(10, True, '') }}</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-500">Subscription</p>
                     <p class="font-medium {% if user.is_paid %}text-green-600{% else %}text-yellow-600{% endif %}">
-                        {% if user.is_paid %}Paid{% if user.paid_date %} (since {{ user.paid_date[:10] }}){% endif %}{% else %}Trial (ends {{ user.trial_ends }}){% endif %}
+                        {% if user.is_paid %}Paid{% if user.paid_date %} (since {{ user.paid_date|string|truncate(10, True, '') }}){% endif %}{% else %}Trial (ends {{ user.trial_ends }}){% endif %}
                     </p>
                 </div>
                 <div>
