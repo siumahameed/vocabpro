@@ -1590,9 +1590,11 @@ def search_users(query: str = "", status: str = "all") -> list:
         cursor.execute(base_query, params)
         users = cursor.fetchall()
 
-        if hasattr(users[0], '_asdict') if users else False:
+        if not users:
+            return []
+        if hasattr(users[0], '_asdict'):
             return [u._asdict() for u in users]
-        return [dict(u) for u in users]
+        return _rows_to_dicts(cursor, users)
     except Exception as e:
         print(f"Error searching users: {e}")
         return []
