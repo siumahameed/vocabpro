@@ -2225,58 +2225,108 @@ def init_contest_tables():
     conn = get_db_connection()
     if not conn:
         return False
-    
+
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS quiz_contests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            week_number INTEGER NOT NULL,
-            year INTEGER NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            reveal_time TEXT NOT NULL,
-            question_count INTEGER DEFAULT 25,
-            status TEXT DEFAULT 'upcoming',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS contest_questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            contest_id INTEGER NOT NULL,
-            question_number INTEGER NOT NULL,
-            question_type TEXT NOT NULL,
-            word_id INTEGER,
-            word TEXT NOT NULL,
-            correct_answer TEXT NOT NULL,
-            options TEXT NOT NULL,
-            phonetic TEXT,
-            FOREIGN KEY (contest_id) REFERENCES quiz_contests(id),
-            UNIQUE(contest_id, question_number)
-        )
-    """)
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS quiz_participations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            contest_id INTEGER NOT NULL,
-            score INTEGER NOT NULL,
-            correct_count INTEGER NOT NULL,
-            wrong_count INTEGER NOT NULL,
-            skipped_count INTEGER DEFAULT 0,
-            time_taken_seconds INTEGER,
-            submitted_at TEXT NOT NULL,
-            rank INTEGER,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (contest_id) REFERENCES quiz_contests(id),
-            UNIQUE(user_id, contest_id)
-        )
-    """)
-    
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_contests (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                week_number INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                reveal_time TEXT NOT NULL,
+                question_count INTEGER DEFAULT 25,
+                status TEXT DEFAULT 'upcoming',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contest_questions (
+                id SERIAL PRIMARY KEY,
+                contest_id INTEGER NOT NULL,
+                question_number INTEGER NOT NULL,
+                question_type TEXT NOT NULL,
+                word_id INTEGER,
+                word TEXT NOT NULL,
+                correct_answer TEXT NOT NULL,
+                options TEXT NOT NULL,
+                phonetic TEXT,
+                FOREIGN KEY (contest_id) REFERENCES quiz_contests(id),
+                UNIQUE(contest_id, question_number)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_participations (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                contest_id INTEGER NOT NULL,
+                score INTEGER NOT NULL,
+                correct_count INTEGER NOT NULL,
+                wrong_count INTEGER NOT NULL,
+                skipped_count INTEGER DEFAULT 0,
+                time_taken_seconds INTEGER,
+                submitted_at TEXT NOT NULL,
+                rank INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (contest_id) REFERENCES quiz_contests(id),
+                UNIQUE(user_id, contest_id)
+            )
+        """)
+    else:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_contests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                week_number INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                reveal_time TEXT NOT NULL,
+                question_count INTEGER DEFAULT 25,
+                status TEXT DEFAULT 'upcoming',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contest_questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contest_id INTEGER NOT NULL,
+                question_number INTEGER NOT NULL,
+                question_type TEXT NOT NULL,
+                word_id INTEGER,
+                word TEXT NOT NULL,
+                correct_answer TEXT NOT NULL,
+                options TEXT NOT NULL,
+                phonetic TEXT,
+                FOREIGN KEY (contest_id) REFERENCES quiz_contests(id),
+                UNIQUE(contest_id, question_number)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_participations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                contest_id INTEGER NOT NULL,
+                score INTEGER NOT NULL,
+                correct_count INTEGER NOT NULL,
+                wrong_count INTEGER NOT NULL,
+                skipped_count INTEGER DEFAULT 0,
+                time_taken_seconds INTEGER,
+                submitted_at TEXT NOT NULL,
+                rank INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (contest_id) REFERENCES quiz_contests(id),
+                UNIQUE(user_id, contest_id)
+            )
+        """)
+
     conn.commit()
     cursor.close()
     conn.close()
@@ -2289,19 +2339,23 @@ def migrate_contest_fields():
     conn = get_db_connection()
     if not conn:
         return False
-    
+
     cursor = conn.cursor()
-    
+
     try:
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [row[1] for row in cursor.fetchall()]
-        
-        if 'total_contests_participated' not in columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN total_contests_participated INTEGER DEFAULT 0")
-        
-        if 'best_contest_rank' not in columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN best_contest_rank INTEGER")
-        
+        if USE_POSTGRES:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS total_contests_participated INTEGER DEFAULT 0")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS best_contest_rank INTEGER")
+        else:
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if 'total_contests_participated' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN total_contests_participated INTEGER DEFAULT 0")
+
+            if 'best_contest_rank' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN best_contest_rank INTEGER")
+
         conn.commit()
         print("Contest migration completed!")
         return True
@@ -2322,12 +2376,20 @@ def create_contest(name: str, week_number: int, year: int, start_time: str, end_
     cursor = conn.cursor()
     
     try:
-        cursor.execute("""
-            INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'upcoming')
-        """, (name, week_number, year, start_time, end_time, reveal_time, question_count))
-        
-        contest_id = cursor.lastrowid
+        if USE_POSTGRES:
+            cursor.execute("""
+                INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'upcoming')
+                RETURNING id
+            """, (name, week_number, year, start_time, end_time, reveal_time, question_count))
+            contest_id = cursor.fetchone()[0]
+        else:
+            cursor.execute("""
+                INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'upcoming')
+            """, (name, week_number, year, start_time, end_time, reveal_time, question_count))
+            contest_id = cursor.lastrowid
+
         conn.commit()
         cursor.close()
         conn.close()
@@ -2366,7 +2428,10 @@ def get_contest_by_id(contest_id: int) -> Optional[dict]:
         return None
     
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM quiz_contests WHERE id = ?", (contest_id,))
+    if USE_POSTGRES:
+        cursor.execute("SELECT * FROM quiz_contests WHERE id = %s", (contest_id,))
+    else:
+        cursor.execute("SELECT * FROM quiz_contests WHERE id = ?", (contest_id,))
     
     contest = cursor.fetchone()
     conn.close()
@@ -2403,7 +2468,10 @@ def update_contest_status(contest_id: int, status: str) -> bool:
     cursor = conn.cursor()
     
     try:
-        cursor.execute("UPDATE quiz_contests SET status = ? WHERE id = ?", (status, contest_id))
+        if USE_POSTGRES:
+            cursor.execute("UPDATE quiz_contests SET status = %s WHERE id = %s", (status, contest_id))
+        else:
+            cursor.execute("UPDATE quiz_contests SET status = ? WHERE id = ?", (status, contest_id))
         conn.commit()
         success = cursor.rowcount > 0
         cursor.close()
@@ -2428,10 +2496,16 @@ def add_contest_question(contest_id: int, question_number: int, question_type: s
         import json
         options_json = json.dumps(options)
         
-        cursor.execute("""
-            INSERT INTO contest_questions (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (contest_id, question_number, question_type, word_id, word, correct_answer, options_json, phonetic))
+        if USE_POSTGRES:
+            cursor.execute("""
+                INSERT INTO contest_questions (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (contest_id, question_number, question_type, word_id, word, correct_answer, options_json, phonetic))
+        else:
+            cursor.execute("""
+                INSERT INTO contest_questions (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (contest_id, question_number, question_type, word_id, word, correct_answer, options_json, phonetic))
         
         conn.commit()
         success = cursor.rowcount > 0
@@ -2452,23 +2526,30 @@ def get_contest_questions(contest_id: int) -> list:
         return []
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT * FROM contest_questions 
-        WHERE contest_id = ? 
-        ORDER BY question_number ASC
-    """, (contest_id,))
-    
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT * FROM contest_questions
+            WHERE contest_id = %s
+            ORDER BY question_number ASC
+        """, (contest_id,))
+    else:
+        cursor.execute("""
+            SELECT * FROM contest_questions
+            WHERE contest_id = ?
+            ORDER BY question_number ASC
+        """, (contest_id,))
+
     questions = cursor.fetchall()
     conn.close()
-    
+
+    import json
     result = []
     for q in questions:
-        q_dict = dict(q)
-        import json
+        q_dict = _row_to_dict(cursor, q)
         q_dict['options'] = json.loads(q_dict['options'])
         result.append(q_dict)
-    
+
     return result
 
 
@@ -2479,23 +2560,30 @@ def shuffle_contest_questions(contest_id: int) -> list:
         return []
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT * FROM contest_questions 
-        WHERE contest_id = ? 
-        ORDER BY RANDOM()
-    """, (contest_id,))
-    
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT * FROM contest_questions
+            WHERE contest_id = %s
+            ORDER BY RANDOM()
+        """, (contest_id,))
+    else:
+        cursor.execute("""
+            SELECT * FROM contest_questions
+            WHERE contest_id = ?
+            ORDER BY RANDOM()
+        """, (contest_id,))
+
     questions = cursor.fetchall()
     conn.close()
-    
+
+    import json
     result = []
     for q in questions:
-        q_dict = dict(q)
-        import json
+        q_dict = _row_to_dict(cursor, q)
         q_dict['options'] = json.loads(q_dict['options'])
         result.append(q_dict)
-    
+
     return result
 
 
@@ -2506,11 +2594,17 @@ def check_user_participation(user_id: int, contest_id: int) -> Optional[dict]:
         return None
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT * FROM quiz_participations 
-        WHERE user_id = ? AND contest_id = ?
-    """, (user_id, contest_id))
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT * FROM quiz_participations
+            WHERE user_id = %s AND contest_id = %s
+        """, (user_id, contest_id))
+    else:
+        cursor.execute("""
+            SELECT * FROM quiz_participations
+            WHERE user_id = ? AND contest_id = ?
+        """, (user_id, contest_id))
     
     participation = cursor.fetchone()
     conn.close()
@@ -2527,15 +2621,26 @@ def save_contest_participation(user_id: int, contest_id: int, score: int, correc
     cursor = conn.cursor()
     
     try:
-        cursor.execute("""
-            INSERT INTO quiz_participations 
-            (user_id, contest_id, score, correct_count, wrong_count, skipped_count, time_taken_seconds, submitted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, contest_id, score, correct_count, wrong_count, skipped_count, time_taken_seconds, submitted_at))
-        
-        cursor.execute("""
-            UPDATE users SET total_contests_participated = total_contests_participated + 1 WHERE id = ?
-        """, (user_id,))
+        if USE_POSTGRES:
+            cursor.execute("""
+                INSERT INTO quiz_participations
+                (user_id, contest_id, score, correct_count, wrong_count, skipped_count, time_taken_seconds, submitted_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (user_id, contest_id, score, correct_count, wrong_count, skipped_count, time_taken_seconds, submitted_at))
+
+            cursor.execute("""
+                UPDATE users SET total_contests_participated = total_contests_participated + 1 WHERE id = %s
+            """, (user_id,))
+        else:
+            cursor.execute("""
+                INSERT INTO quiz_participations
+                (user_id, contest_id, score, correct_count, wrong_count, skipped_count, time_taken_seconds, submitted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, contest_id, score, correct_count, wrong_count, skipped_count, time_taken_seconds, submitted_at))
+
+            cursor.execute("""
+                UPDATE users SET total_contests_participated = total_contests_participated + 1 WHERE id = ?
+            """, (user_id,))
         
         conn.commit()
         success = cursor.rowcount > 0
@@ -2558,34 +2663,61 @@ def calculate_and_save_ranks(contest_id: int) -> bool:
     cursor = conn.cursor()
     
     try:
-        cursor.execute("""
-            SELECT id FROM quiz_participations 
-            WHERE contest_id = ? 
-            ORDER BY score DESC, time_taken_seconds ASC
-        """, (contest_id,))
-        
-        participations = cursor.fetchall()
-        
-        for rank, (p_id,) in enumerate(participations, 1):
+        if USE_POSTGRES:
             cursor.execute("""
-                UPDATE quiz_participations SET rank = ? WHERE id = ?
-            """, (rank, p_id))
-            
-            if rank <= 10:
+                SELECT id FROM quiz_participations
+                WHERE contest_id = %s
+                ORDER BY score DESC, time_taken_seconds ASC
+            """, (contest_id,))
+        else:
+            cursor.execute("""
+                SELECT id FROM quiz_participations
+                WHERE contest_id = ?
+                ORDER BY score DESC, time_taken_seconds ASC
+            """, (contest_id,))
+
+        participations = cursor.fetchall()
+
+        for rank, (p_id,) in enumerate(participations, 1):
+            if USE_POSTGRES:
                 cursor.execute("""
-                    SELECT user_id FROM quiz_participations WHERE id = ?
-                """, (p_id,))
+                    UPDATE quiz_participations SET rank = %s WHERE id = %s
+                """, (rank, p_id))
+            else:
+                cursor.execute("""
+                    UPDATE quiz_participations SET rank = ? WHERE id = ?
+                """, (rank, p_id))
+
+            if rank <= 10:
+                if USE_POSTGRES:
+                    cursor.execute("""
+                        SELECT user_id FROM quiz_participations WHERE id = %s
+                    """, (p_id,))
+                else:
+                    cursor.execute("""
+                        SELECT user_id FROM quiz_participations WHERE id = ?
+                    """, (p_id,))
                 row = cursor.fetchone()
                 if row:
                     user_id = row[0]
-                    cursor.execute("""
-                        SELECT best_contest_rank FROM users WHERE id = ?
-                    """, (user_id,))
+                    if USE_POSTGRES:
+                        cursor.execute("""
+                            SELECT best_contest_rank FROM users WHERE id = %s
+                        """, (user_id,))
+                    else:
+                        cursor.execute("""
+                            SELECT best_contest_rank FROM users WHERE id = ?
+                        """, (user_id,))
                     current_best = cursor.fetchone()
                     if current_best and (current_best[0] is None or rank < current_best[0]):
-                        cursor.execute("""
-                            UPDATE users SET best_contest_rank = ? WHERE id = ?
-                        """, (rank, user_id))
+                        if USE_POSTGRES:
+                            cursor.execute("""
+                                UPDATE users SET best_contest_rank = %s WHERE id = %s
+                            """, (rank, user_id))
+                        else:
+                            cursor.execute("""
+                                UPDATE users SET best_contest_rank = ? WHERE id = ?
+                            """, (rank, user_id))
         
         conn.commit()
         cursor.close()
@@ -2605,16 +2737,27 @@ def get_contest_leaderboard(contest_id: int, limit: int = 100) -> list:
         return []
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT qp.rank, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds,
-               u.id as user_id, u.name, u.whatsapp_number
-        FROM quiz_participations qp
-        JOIN users u ON qp.user_id = u.id
-        WHERE qp.contest_id = ? AND qp.rank IS NOT NULL
-        ORDER BY qp.rank ASC
-        LIMIT ?
-    """, (contest_id, limit))
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT qp.rank, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds,
+                   u.id as user_id, u.name, u.whatsapp_number
+            FROM quiz_participations qp
+            JOIN users u ON qp.user_id = u.id
+            WHERE qp.contest_id = %s AND qp.rank IS NOT NULL
+            ORDER BY qp.rank ASC
+            LIMIT %s
+        """, (contest_id, limit))
+    else:
+        cursor.execute("""
+            SELECT qp.rank, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds,
+                   u.id as user_id, u.name, u.whatsapp_number
+            FROM quiz_participations qp
+            JOIN users u ON qp.user_id = u.id
+            WHERE qp.contest_id = ? AND qp.rank IS NOT NULL
+            ORDER BY qp.rank ASC
+            LIMIT ?
+        """, (contest_id, limit))
     
     rows = cursor.fetchall()
     conn.close()
@@ -2642,13 +2785,21 @@ def get_user_contest_rank(user_id: int, contest_id: int) -> Optional[dict]:
         return None
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT qp.rank, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds,
-               (SELECT COUNT(*) FROM quiz_participations WHERE contest_id = ? AND rank IS NOT NULL) as total_participants
-        FROM quiz_participations qp
-        WHERE qp.user_id = ? AND qp.contest_id = ?
-    """, (contest_id, user_id, contest_id))
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT qp.rank, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds,
+                   (SELECT COUNT(*) FROM quiz_participations WHERE contest_id = %s AND rank IS NOT NULL) as total_participants
+            FROM quiz_participations qp
+            WHERE qp.user_id = %s AND qp.contest_id = %s
+        """, (contest_id, user_id, contest_id))
+    else:
+        cursor.execute("""
+            SELECT qp.rank, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds,
+                   (SELECT COUNT(*) FROM quiz_participations WHERE contest_id = ? AND rank IS NOT NULL) as total_participants
+            FROM quiz_participations qp
+            WHERE qp.user_id = ? AND qp.contest_id = ?
+        """, (contest_id, user_id, contest_id))
     
     row = cursor.fetchone()
     conn.close()
@@ -2674,15 +2825,25 @@ def get_user_contest_history(user_id: int) -> list:
         return []
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT qc.id, qc.name, qc.week_number, qc.year, qc.start_time, qc.end_time, qc.status,
-               qp.score, qp.correct_count, qp.wrong_count, qp.rank, qp.time_taken_seconds
-        FROM quiz_contests qc
-        JOIN quiz_participations qp ON qc.id = qp.contest_id
-        WHERE qp.user_id = ?
-        ORDER BY qc.end_time DESC
-    """, (user_id,))
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT qc.id, qc.name, qc.week_number, qc.year, qc.start_time, qc.end_time, qc.status,
+                   qp.score, qp.correct_count, qp.wrong_count, qp.rank, qp.time_taken_seconds
+            FROM quiz_contests qc
+            JOIN quiz_participations qp ON qc.id = qp.contest_id
+            WHERE qp.user_id = %s
+            ORDER BY qc.end_time DESC
+        """, (user_id,))
+    else:
+        cursor.execute("""
+            SELECT qc.id, qc.name, qc.week_number, qc.year, qc.start_time, qc.end_time, qc.status,
+                   qp.score, qp.correct_count, qp.wrong_count, qp.rank, qp.time_taken_seconds
+            FROM quiz_contests qc
+            JOIN quiz_participations qp ON qc.id = qp.contest_id
+            WHERE qp.user_id = ?
+            ORDER BY qc.end_time DESC
+        """, (user_id,))
     
     rows = cursor.fetchall()
     conn.close()
@@ -2714,15 +2875,25 @@ def get_top_5_winners(contest_id: int) -> list:
         return []
     
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT qp.rank, qp.score, qp.time_taken_seconds,
-               u.id, u.name, u.whatsapp_number
-        FROM quiz_participations qp
-        JOIN users u ON qp.user_id = u.id
-        WHERE qp.contest_id = ? AND qp.rank <= 5 AND qp.rank IS NOT NULL
-        ORDER BY qp.rank ASC
-    """, (contest_id,))
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT qp.rank, qp.score, qp.time_taken_seconds,
+                   u.id, u.name, u.whatsapp_number
+            FROM quiz_participations qp
+            JOIN users u ON qp.user_id = u.id
+            WHERE qp.contest_id = %s AND qp.rank <= 5 AND qp.rank IS NOT NULL
+            ORDER BY qp.rank ASC
+        """, (contest_id,))
+    else:
+        cursor.execute("""
+            SELECT qp.rank, qp.score, qp.time_taken_seconds,
+                   u.id, u.name, u.whatsapp_number
+            FROM quiz_participations qp
+            JOIN users u ON qp.user_id = u.id
+            WHERE qp.contest_id = ? AND qp.rank <= 5 AND qp.rank IS NOT NULL
+            ORDER BY qp.rank ASC
+        """, (contest_id,))
     
     rows = cursor.fetchall()
     conn.close()
@@ -2754,7 +2925,10 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (question_count,))
+        if USE_POSTGRES:
+            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (question_count,))
+        else:
+            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (question_count,))
         words = cursor.fetchall()
         
         if len(words) < question_count:
@@ -2775,20 +2949,32 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
                 question_text = word
                 correct_answer = meaning_bn
                 
-                cursor.execute("""
-                    SELECT meaning_bn FROM vocabulary 
-                    WHERE id != ? ORDER BY RANDOM() LIMIT 3
-                """, (word_id,))
+                if USE_POSTGRES:
+                    cursor.execute("""
+                        SELECT meaning_bn FROM vocabulary
+                        WHERE id != %s ORDER BY RANDOM() LIMIT 3
+                    """, (word_id,))
+                else:
+                    cursor.execute("""
+                        SELECT meaning_bn FROM vocabulary
+                        WHERE id != ? ORDER BY RANDOM() LIMIT 3
+                    """, (word_id,))
                 wrong_options = [row[0] for row in cursor.fetchall()]
             else:
                 question_type = "bn_to_en"
                 question_text = meaning_bn
                 correct_answer = word
                 
-                cursor.execute("""
-                    SELECT word FROM vocabulary 
-                    WHERE id != ? ORDER BY RANDOM() LIMIT 3
-                """, (word_id,))
+                if USE_POSTGRES:
+                    cursor.execute("""
+                        SELECT word FROM vocabulary
+                        WHERE id != %s ORDER BY RANDOM() LIMIT 3
+                    """, (word_id,))
+                else:
+                    cursor.execute("""
+                        SELECT word FROM vocabulary
+                        WHERE id != ? ORDER BY RANDOM() LIMIT 3
+                    """, (word_id,))
                 wrong_options = [row[0] for row in cursor.fetchall()]
             
             if len(wrong_options) < 3:
@@ -2798,11 +2984,18 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
             random.shuffle(options)
             
             try:
-                cursor.execute("""
-                    INSERT INTO contest_questions 
-                    (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (contest_id, i + 1, question_type, word_id, word, correct_answer, json.dumps(options), phonetic or ""))
+                if USE_POSTGRES:
+                    cursor.execute("""
+                        INSERT INTO contest_questions
+                        (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (contest_id, i + 1, question_type, word_id, word, correct_answer, json.dumps(options), phonetic or ""))
+                else:
+                    cursor.execute("""
+                        INSERT INTO contest_questions
+                        (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (contest_id, i + 1, question_type, word_id, word, correct_answer, json.dumps(options), phonetic or ""))
                 saved += 1
             except:
                 pass
