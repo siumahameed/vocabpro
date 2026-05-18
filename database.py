@@ -442,7 +442,7 @@ def get_active_subscribers() -> list:
         return []
     if hasattr(users[0], '_asdict'):
         return [u._asdict() for u in users]
-    return [dict(u) for u in users]
+    return _rows_to_dicts(cursor, users)
 
 def get_all_subscribers() -> list:
     conn = get_db_connection()
@@ -458,8 +458,12 @@ def get_all_subscribers() -> list:
     
     users = cursor.fetchall()
     conn.close()
-    
-    return [dict(u) for u in users]
+
+    if not users:
+        return []
+    if hasattr(users[0], '_asdict'):
+        return [u._asdict() for u in users]
+    return _rows_to_dicts(cursor, users)
 
 def get_users_by_time(time: str) -> list:
     conn = get_db_connection()
@@ -480,7 +484,7 @@ def get_users_by_time(time: str) -> list:
         return []
     if hasattr(users[0], '_asdict'):
         return [u._asdict() for u in users]
-    return [dict(u) for u in users]
+    return _rows_to_dicts(cursor, users)
 
 def update_preferred_time(user_id: int, preferred_time: str) -> bool:
     conn = get_db_connection()
@@ -845,7 +849,7 @@ def get_pending_payments() -> list:
         return []
     if hasattr(payments[0], '_asdict'):
         return [p._asdict() for p in payments]
-    return [dict(p) for p in payments]
+    return _rows_to_dicts(cursor, payments)
 
 def approve_payment(payment_id: int, admin_username: str):
     conn = get_db_connection()
@@ -928,7 +932,7 @@ def get_user_payments(user_id: int) -> list:
         return []
     if hasattr(payments[0], '_asdict'):
         return [p._asdict() for p in payments]
-    return [dict(p) for p in payments]
+    return _rows_to_dicts(cursor, payments)
 
 def get_stats() -> dict:
     conn = get_db_connection()
@@ -1058,7 +1062,7 @@ def get_daily_vocabulary(count: int = 10) -> list:
         return get_default_vocabulary()
     if hasattr(words[0], '_asdict'):
         return [w._asdict() for w in words]
-    return [dict(w) for w in words]
+    return _rows_to_dicts(cursor, words)
 
 def get_default_vocabulary() -> list:
     return [
@@ -1722,7 +1726,7 @@ def get_all_payments(status: str = "all") -> list:
             cursor.execute(query + " ORDER BY p.created_at DESC")
 
         payments = cursor.fetchall()
-        return [dict(p) for p in payments]
+        return _rows_to_dicts(cursor, payments)
     except Exception as e:
         print(f"Error getting payments: {e}")
         return []
@@ -1877,7 +1881,7 @@ def search_vocabulary(query: str = "", category: str = "all") -> list:
 
         cursor.execute(base_query, params)
         words = cursor.fetchall()
-        return [dict(w) for w in words]
+        return _rows_to_dicts(cursor, words)
     except Exception as e:
         print(f"Error searching vocabulary: {e}")
         return []
