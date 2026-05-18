@@ -82,10 +82,10 @@ app = FastAPI(title="VocabPro", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    cookie_name="vocabpro_session",
-    cookie_secure=True,
-    cookie_httponly=True,
-    cookie_samesite="lax"
+    session_cookie="vocabpro_session",
+    secure=True,
+    httponly=True,
+    same_site="lax"
 )
 
 # Mount static files
