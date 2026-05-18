@@ -30,6 +30,20 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return hashlib.sha256(password.encode()).hexdigest() == hashed
 
+def _row_to_dict(cursor, row):
+    """Convert a database row to a dict using cursor description"""
+    if not row:
+        return None
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    return dict(zip(columns, row)) if columns else None
+
+def _rows_to_dicts(cursor, rows):
+    """Convert multiple database rows to dicts"""
+    if not rows:
+        return []
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    return [dict(zip(columns, row)) for row in rows] if columns else []
+
 def get_db_connection():
     """Get database connection"""
     if USE_POSTGRES:
@@ -41,7 +55,6 @@ def get_db_connection():
                 user=DB_USER,
                 password=DB_PASSWORD
             )
-            conn.cursor_factory = RealDictCursor
             return conn
         except Exception as e:
             print(f"PostgreSQL connection error: {e}")
@@ -262,29 +275,35 @@ def verify_user(email: str, password: str) -> Optional[dict]:
     else:
         cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
 
-    user = cursor.fetchone()
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    row = cursor.fetchone()
     conn.close()
 
-    if user and verify_password(password, user["password_hash"]):
-        return dict(user)
+    if not row:
+        return None
+
+    user = dict(zip(columns, row)) if columns else None
+    if user and verify_password(password, user.get("password_hash", "")):
+        return user
     return None
 
 def get_user_by_id(user_id: int) -> Optional[dict]:
     conn = get_db_connection()
     if not conn:
         return None
-    
+
     cursor = conn.cursor()
-    
+
     if USE_POSTGRES:
         cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     else:
         cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-    
-    user = cursor.fetchone()
+
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    row = cursor.fetchone()
     conn.close()
-    
-    return dict(user) if user else None
+
+    return dict(zip(columns, row)) if row and columns else None
 
 def update_user_profile(user_id: int, data: dict) -> bool:
     conn = get_db_connection()
@@ -354,8 +373,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
     
     user = cursor.fetchone()
     conn.close()
-    
-    return dict(user) if user else None
+
+    return _row_to_dict(cursor, user)
 
 def get_all_users() -> list:
     conn = get_db_connection()
@@ -956,45 +975,48 @@ def get_user_stats(user_id: int) -> dict:
     conn = get_db_connection()
     if not conn:
         return {}
-    
+
     cursor = conn.cursor()
-    
+
     if USE_POSTGRES:
         cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     else:
         cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-    
-    user = cursor.fetchone()
-    
-    if not user:
+
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    row = cursor.fetchone()
+
+    if not row:
         conn.close()
         return {}
-    
+
+    user = dict(zip(columns, row)) if columns else {}
+
     if USE_POSTGRES:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE words_learned > %s", (user["words_learned"],))
+        cursor.execute("SELECT COUNT(*) FROM users WHERE words_learned > %s", (user.get("words_learned", 0),))
     else:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE words_learned > ?", (user["words_learned"],))
-    
+        cursor.execute("SELECT COUNT(*) FROM users WHERE words_learned > ?", (user.get("words_learned", 0),))
+
     users_ahead = cursor.fetchone()[0]
-    
+
     if USE_POSTGRES:
         cursor.execute("SELECT COUNT(*) FROM users")
     else:
         cursor.execute("SELECT COUNT(*) FROM users")
-    
+
     total = cursor.fetchone()[0]
-    
+
     percentile = 100 - (users_ahead / total * 100) if total > 0 else 0
-    
+
     conn.close()
-    
+
     return {
-        "words_learned": user["words_learned"],
-        "word_index": user["last_word_index"],
-        "referral_count": user["referral_count"],
-        "free_months": user["free_months_earned"],
+        "words_learned": user.get("words_learned", 0),
+        "word_index": user.get("last_word_index", 0),
+        "referral_count": user.get("referral_count", 0),
+        "free_months": user.get("free_months_earned", 0),
         "percentile": round(percentile, 1),
-        "subscription": "Pro" if user["is_paid"] else "Trial"
+        "subscription": "Pro" if user.get("is_paid") else "Trial"
     }
 
 def get_daily_vocabulary(count: int = 10) -> list:
@@ -1602,7 +1624,7 @@ def get_user_detail(user_id: int) -> dict:
         if not user:
             return {}
 
-        user_dict = dict(user)
+        user_dict = _row_to_dict(cursor, user)
 
         # Get payment history
         if USE_POSTGRES:
@@ -2314,7 +2336,7 @@ def get_current_contest() -> Optional[dict]:
     contest = cursor.fetchone()
     conn.close()
     
-    return dict(contest) if contest else None
+    return _row_to_dict(cursor, contest)
 
 
 def get_contest_by_id(contest_id: int) -> Optional[dict]:
@@ -2329,7 +2351,7 @@ def get_contest_by_id(contest_id: int) -> Optional[dict]:
     contest = cursor.fetchone()
     conn.close()
     
-    return dict(contest) if contest else None
+    return _row_to_dict(cursor, contest)
 
 
 def get_completed_contest() -> Optional[dict]:
@@ -2349,7 +2371,7 @@ def get_completed_contest() -> Optional[dict]:
     contest = cursor.fetchone()
     conn.close()
     
-    return dict(contest) if contest else None
+    return _row_to_dict(cursor, contest)
 
 
 def update_contest_status(contest_id: int, status: str) -> bool:
@@ -2472,8 +2494,8 @@ def check_user_participation(user_id: int, contest_id: int) -> Optional[dict]:
     
     participation = cursor.fetchone()
     conn.close()
-    
-    return dict(participation) if participation else None
+
+    return _row_to_dict(cursor, participation)
 
 
 def save_contest_participation(user_id: int, contest_id: int, score: int, correct_count: int, wrong_count: int, skipped_count: int, time_taken_seconds: int, submitted_at: str) -> bool:
@@ -2827,7 +2849,7 @@ def reset_weekly_words_if_needed(user_id: int):
             cursor.execute("SELECT week_start_date, weekly_words_learned FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
         if row:
-            row = dict(row)
+            row = _row_to_dict(cursor, row)
             week_start = row.get("week_start_date")
             if week_start:
                 if isinstance(week_start, str):
@@ -2865,7 +2887,7 @@ def reset_monthly_words_if_needed(user_id: int):
             cursor.execute("SELECT month_start_date FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
         if row:
-            row = dict(row)
+            row = _row_to_dict(cursor, row)
             month_start = row.get("month_start_date")
             if month_start:
                 if isinstance(month_start, str):
@@ -3066,7 +3088,7 @@ def get_chat_history(user_id: int, limit: int = 50, persona: str = None) -> list
                 """, (user_id, limit))
 
         rows = cursor.fetchall()
-        messages = [dict(row) for row in rows]
+        messages = _rows_to_dicts(cursor, rows)
         messages.reverse()  # oldest first
         return messages
     except Exception as e:
@@ -3097,7 +3119,7 @@ def get_chat_context(user_id: int, limit: int = 20, persona: str = "tutor") -> l
             """, (user_id, persona, limit))
 
         rows = cursor.fetchall()
-        messages = [{"role": dict(row)["role"], "content": dict(row)["content"]} for row in rows]
+        messages = [{"role": r.get("role", r[0]) if isinstance(r, dict) else r[0], "content": r.get("content", r[1]) if isinstance(r, dict) else r[1]} for r in rows]
         messages.reverse()
         return messages
     except Exception as e:
