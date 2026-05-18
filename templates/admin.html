@@ -216,7 +216,7 @@
                                     </span>
                                 </td>
                                 <td class="hidden md:table-cell">{{ user.streak_days or 0 }} days</td>
-                                <td class="hidden lg:table-cell">{{ user.created_at[:10] }}</td>
+                                <td class="hidden lg:table-cell">{{ user.created_at|string|truncate(10, True, '') }}</td>
                                 <td class="flex gap-2">
                                     <button onclick="viewUser({{ user.id }})" class="text-blue-600 hover:text-blue-800 text-sm">View</button>
                                     <button onclick="toggleSubscription({{ user.id }})" class="text-sm {% if user.is_paid %}text-red-600{% else %}text-green-600{% endif %}">

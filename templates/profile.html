@@ -120,7 +120,7 @@
             <div class="space-y-3 text-sm">
                 <div class="flex justify-between">
                     <span class="text-gray-500">Member Since</span>
-                    <span class="font-medium">{{ user.created_at[:10] if user.created_at else 'N/A' }}</span>
+                    <span class="font-medium">{{ user.created_at|string|truncate(10, True, '') if user.created_at else 'N/A' }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-500">Words Learned</span>
