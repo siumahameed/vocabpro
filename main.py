@@ -83,8 +83,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     session_cookie="vocabpro_session",
-    secure=True,
-    httponly=True,
+    https_only=True,
     same_site="lax"
 )
 
