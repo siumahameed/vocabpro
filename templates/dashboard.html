@@ -1,0 +1,1119 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - VocabPro{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+    .trial-badge {
+        animation: pulse 2s infinite;
+    }
+    /* Quiz option animations */
+    .quiz-opt {
+        transition: all 0.2s ease;
+    }
+    .quiz-opt:hover {
+        transform: translateX(4px);
+    }
+    .quiz-opt:active {
+        transform: scale(0.98);
+    }
+    .quiz-opt.correct-opt {
+        border-color: #22c55e !important;
+        background: #f0fdf4 !important;
+        color: #15803d !important;
+        animation: popCorrect 0.3s ease;
+    }
+    .quiz-opt.wrong-opt {
+        border-color: #ef4444 !important;
+        background: #fef2f2 !important;
+        color: #b91c1c !important;
+        animation: shake 0.4s ease;
+    }
+    .quiz-opt.correct-opt .bg-gray-100,
+    .quiz-opt.wrong-opt .bg-gray-100 {
+        background: transparent !important;
+    }
+    .quiz-opt.disabled-opt {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+    @keyframes popCorrect {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.03); }
+        100% { transform: scale(1); }
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+    }
+    @keyframes confettiFall {
+        0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(60px) rotate(720deg); opacity: 0; }
+    }
+    .confetti-piece {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        animation: confettiFall 1.5s ease-out forwards;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- Welcome Header -->
+        <div class="mb-6 sm:mb-8">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Welcome, {{ user.name }}! 👋</h1>
+            <p class="text-gray-600 text-sm sm:text-base">Manage your vocabulary learning journey</p>
+        </div>
+        
+        <!-- Status Banner -->
+        {% if not user.is_paid %}
+        <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-lg">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl">⏰</span>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        {% if days_left > 0 %}
+                        <strong>Trial Period:</strong> {{ days_left }} days remaining. 
+                        <a href="/payment" class="underline font-semibold">Upgrade now</a> to continue receiving words!
+                        {% else %}
+                        <strong>Trial Expired!</strong> 
+                        <a href="/payment" class="underline font-semibold">Pay 15 Taka</a> to continue.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400 p-4 mb-8 rounded-r-lg">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl">✅</span>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-green-700">
+                        <strong>Pro Member!</strong> Your subscription is active. Daily words at 9:30 AM.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Progress Tracker -->
+        <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-100">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">📊 Your Learning Progress</h3>
+            <div class="grid grid-cols-3 gap-3 sm:gap-6">
+                <!-- Streak -->
+                <div class="text-center p-2.5 sm:p-4 bg-orange-50 rounded-lg">
+                    <div class="text-2xl sm:text-4xl font-bold text-orange-600" id="streakCount">-</div>
+                    <p class="text-xs sm:text-sm text-gray-600 mt-1">🔥 Streak</p>
+                </div>
+                <!-- Total Words -->
+                <div class="text-center p-2.5 sm:p-4 bg-blue-50 rounded-lg">
+                    <div class="text-2xl sm:text-4xl font-bold text-blue-600" id="totalWords">-</div>
+                    <p class="text-xs sm:text-sm text-gray-600 mt-1">📚 Words</p>
+                </div>
+                <!-- Words Sent -->
+                <div class="text-center p-2.5 sm:p-4 bg-green-50 rounded-lg">
+                    <div class="text-2xl sm:text-4xl font-bold text-green-600" id="wordsSent">-</div>
+                    <p class="text-xs sm:text-sm text-gray-600 mt-1">📨 Received</p>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="mt-6">
+                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                    <span>Monthly Goal: 300 words</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div id="progressBar" class="bg-gradient-to-r from-blue-600 to-green-500 h-3 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+            <!-- Subscription Status -->
+            <div class="stat-card bg-white rounded-xl shadow-sm p-3 sm:p-5 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="w-9 h-9 sm:w-11 sm:h-11 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-lg sm:text-xl">📱</span>
+                    </div>
+                    <div class="ml-2.5 sm:ml-3 min-w-0">
+                        <p class="text-xs sm:text-sm text-gray-500">Status</p>
+                        <p class="text-base sm:text-lg font-bold {% if user.is_paid %}text-green-600{% else %}text-yellow-600{% endif %}">
+                            {% if user.is_paid %}Pro{% else %}Trial{% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Days Remaining -->
+            <div class="stat-card bg-white rounded-xl shadow-sm p-3 sm:p-5 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="w-9 h-9 sm:w-11 sm:h-11 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-lg sm:text-xl">📅</span>
+                    </div>
+                    <div class="ml-2.5 sm:ml-3 min-w-0">
+                        <p class="text-xs sm:text-sm text-gray-500">Days Left</p>
+                        <p class="text-base sm:text-lg font-bold text-purple-600">{{ days_left }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WhatsApp Number -->
+            <div class="stat-card bg-white rounded-xl shadow-sm p-3 sm:p-5 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="w-9 h-9 sm:w-11 sm:h-11 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-lg sm:text-xl">💬</span>
+                    </div>
+                    <div class="ml-2.5 sm:ml-3 min-w-0">
+                        <p class="text-xs sm:text-sm text-gray-500">WhatsApp</p>
+                        <p class="text-sm sm:text-base font-bold text-gray-900 truncate">{{ user.whatsapp_number }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next Delivery -->
+            <div class="stat-card bg-white rounded-xl shadow-sm p-3 sm:p-5 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="w-9 h-9 sm:w-11 sm:h-11 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-lg sm:text-xl">⏰</span>
+                    </div>
+                    <div class="ml-2.5 sm:ml-3 min-w-0">
+                        <p class="text-xs sm:text-sm text-gray-500">Next Words</p>
+                        <p class="text-base sm:text-lg font-bold text-orange-600">9:30 AM</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contests Participated -->
+            <div class="stat-card bg-white rounded-xl shadow-sm p-3 sm:p-5 border border-gray-100 col-span-2 sm:col-span-1">
+                <div class="flex items-center">
+                    <div class="w-9 h-9 sm:w-11 sm:h-11 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-lg sm:text-xl">🏆</span>
+                    </div>
+                    <div class="ml-2.5 sm:ml-3 min-w-0">
+                        <p class="text-xs sm:text-sm text-gray-500">Contests</p>
+                        <p class="text-base sm:text-lg font-bold text-yellow-600">{{ user.total_contests_participated or 0 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Contest Widget -->
+        <div id="contest-widget" class="bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-6 mb-6 sm:mb-8 text-white overflow-hidden relative">
+            <div class="absolute top-0 right-0 w-40 h-40 sm:w-64 sm:h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3"></div>
+            <div class="absolute bottom-0 left-0 w-32 h-32 sm:w-48 sm:h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/3"></div>
+
+            <div class="relative z-10">
+                <div class="flex items-start justify-between gap-2 mb-3 sm:mb-0">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xl sm:text-2xl">🏆</span>
+                            <h3 class="text-base sm:text-xl font-bold truncate" id="contest-name">Weekly Challenge</h3>
+                        </div>
+                        <p class="text-indigo-200 text-xs sm:text-sm" id="contest-dates">Loading...</p>
+                    </div>
+                    <div id="contest-status-badge" class="px-2.5 py-1 sm:px-3 bg-white/20 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0">
+                        Loading...
+                    </div>
+                </div>
+
+                <div class="mt-3 sm:mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center justify-center sm:justify-start gap-3 sm:gap-4">
+                        <div class="text-center">
+                            <p class="text-2xl sm:text-3xl font-bold" id="contest-hours">--</p>
+                            <p class="text-xs text-indigo-200">Hours Left</p>
+                        </div>
+                        <div class="w-px h-8 sm:h-10 bg-white/30"></div>
+                        <div class="text-center">
+                            <p class="text-2xl sm:text-3xl font-bold" id="contest-questions">25</p>
+                            <p class="text-xs text-indigo-200">Questions</p>
+                        </div>
+                        <div class="w-px h-8 sm:h-10 bg-white/30"></div>
+                        <div class="text-center">
+                            <p class="text-2xl sm:text-3xl font-bold" id="contest-participants">--</p>
+                            <p class="text-xs text-indigo-200">Participants</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 sm:gap-3">
+                        <a id="contest-participate-btn" href="#" class="flex-1 sm:flex-none text-center px-4 py-2.5 sm:px-6 sm:py-3 bg-white text-indigo-700 rounded-lg sm:rounded-xl text-sm sm:text-base font-bold hover:bg-indigo-50 transition shadow-lg">
+                            Participate Now
+                        </a>
+                        <a id="contest-leaderboard-btn" href="#" class="flex-1 sm:flex-none text-center px-4 py-2.5 sm:px-6 sm:py-3 bg-white/20 text-white rounded-lg sm:rounded-xl text-sm sm:text-base font-medium hover:bg-white/30 transition">
+                            Leaderboard
+                        </a>
+                    </div>
+                </div>
+
+                <div id="contest-message" class="mt-3 sm:mt-4 text-xs sm:text-sm text-indigo-200 hidden"></div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <!-- Quiz -->
+            <div class="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-sm p-4 sm:p-6 text-white">
+                <h3 class="text-base sm:text-lg font-semibold mb-2 sm:mb-4">🧠 Word Quiz</h3>
+                <p class="text-purple-100 text-sm mb-1">Test your vocabulary knowledge!</p>
+                <p class="text-purple-200 text-sm mb-3 sm:mb-4">High Score: <span id="quizHighScore" class="font-bold text-white">{{ user.quiz_high_score or 0 }}%</span></p>
+                <button onclick="showQuizTypeModal()" class="w-full bg-white text-purple-700 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-50 transition">
+                    Start Quiz
+                </button>
+            </div>
+
+            <!-- Payment -->
+            <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100 sm:col-span-2 lg:col-span-1">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-4">💳 Upgrade to Pro</h3>
+                <p class="text-gray-600 text-sm mb-3 sm:mb-4">Get unlimited daily vocabulary for only 15 Taka/month</p>
+                <a href="/payment" class="block w-full bg-green-500 text-white text-center py-2.5 sm:py-3 rounded-lg text-sm sm:text-base font-semibold hover:bg-green-600 transition">
+                    Pay 15 Taka Now
+                </a>
+            </div>
+        </div>
+
+        <!-- Message Time + Word Category (side by side) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+
+            <!-- Message Time Settings -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                            <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-white">Delivery Time</h3>
+                            <p class="text-indigo-100 text-xs">When to receive daily words</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <div class="text-center mb-3">
+                        <p class="text-xs text-gray-500 mb-1">Daily words arrive at</p>
+                        <div class="inline-flex items-center space-x-1.5 bg-indigo-50 rounded-full px-4 py-1.5">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span class="text-xl font-bold text-indigo-700" id="currentTimeDisplay">{{ user.preferred_time }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 text-center">Quick Select</p>
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button type="button" data-time="09:00" class="time-preset bg-gray-50 hover:bg-indigo-50 hover:border-indigo-300 border border-gray-200 rounded-md py-1.5 text-xs font-medium text-gray-700 hover:text-indigo-700 transition-all">
+                                9:00 AM
+                            </button>
+                            <button type="button" data-time="12:00" class="time-preset bg-gray-50 hover:bg-indigo-50 hover:border-indigo-300 border border-gray-200 rounded-md py-1.5 text-xs font-medium text-gray-700 hover:text-indigo-700 transition-all">
+                                12:00 PM
+                            </button>
+                            <button type="button" data-time="17:00" class="time-preset bg-gray-50 hover:bg-indigo-50 hover:border-indigo-300 border border-gray-200 rounded-md py-1.5 text-xs font-medium text-gray-700 hover:text-indigo-700 transition-all">
+                                5:00 PM
+                            </button>
+                            <button type="button" data-time="21:00" class="time-preset bg-gray-50 hover:bg-indigo-50 hover:border-indigo-300 border border-gray-200 rounded-md py-1.5 text-xs font-medium text-gray-700 hover:text-indigo-700 transition-all">
+                                9:00 PM
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="time" id="preferredTime"
+                               min="11:00" max="23:00"
+                               value="{{ user.preferred_time }}"
+                               class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        <button id="saveTimeBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md active:scale-95">
+                            Save
+                        </button>
+                    </div>
+                    <div id="timeMessage" class="hidden text-center p-2 rounded-lg text-xs mt-2"></div>
+                    <p class="text-xs text-gray-400 text-center mt-2">11 AM - 11 PM (Asia/Dhaka)</p>
+                </div>
+            </div>
+
+            <!-- Word Category Settings -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                            <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-white">Word Category</h3>
+                            <p class="text-emerald-100 text-xs">Choose your word type</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <div class="text-center mb-3">
+                        <p class="text-xs text-gray-500 mb-1">Current category</p>
+                        <span class="inline-block px-3 py-1 bg-emerald-50 rounded-full text-sm font-bold text-emerald-700 uppercase" id="currentCategoryDisplay">{{ user.preferred_category }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select id="preferredCategory" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-center text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+                            <option value="ielts" {% if user.preferred_category == 'ielts' %}selected{% endif %}>IELTS</option>
+                            <option value="gre" {% if user.preferred_category == 'gre' %}selected{% endif %}>GRE</option>
+                            <option value="common" {% if user.preferred_category == 'common' %}selected{% endif %}>Common Words</option>
+                        </select>
+                        <button id="saveCategoryBtn" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md active:scale-95">
+                            Request
+                        </button>
+                    </div>
+                    <div id="categoryMessage" class="hidden text-center p-2 rounded-lg text-xs mt-2"></div>
+                    <p class="text-xs text-gray-400 text-center mt-2">Admin approval required. Max 2/month.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Leaderboard Section -->
+        <div id="leaderboard-section" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 sm:mb-8 overflow-hidden">
+            <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-4 sm:px-6 py-3 sm:py-4">
+                <div class="flex items-center space-x-2.5 sm:space-x-3">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                        <span class="text-lg sm:text-2xl">🏅</span>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-semibold text-white">Leaderboard</h3>
+                        <p class="text-amber-100 text-xs sm:text-sm">See how you rank against other learners</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 sm:p-6">
+                <!-- Leaderboard Tabs -->
+                <div class="flex gap-1.5 sm:gap-2 mb-4 sm:mb-6 overflow-x-auto pb-1">
+                    <button onclick="loadLeaderboard('weekly')" id="lb-weekly" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-orange-100 text-orange-700 transition whitespace-nowrap">Weekly</button>
+                    <button onclick="loadLeaderboard('monthly')" id="lb-monthly" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">Monthly</button>
+                    <button onclick="loadLeaderboard('streak')" id="lb-streak" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">Streak</button>
+                    <button onclick="loadLeaderboard('all_time')" id="lb-all_time" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">All Time</button>
+                </div>
+
+                <!-- Your Rank -->
+                <div id="your-rank" class="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 border border-orange-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5 sm:gap-3">
+                            <span class="text-xl sm:text-2xl">👤</span>
+                            <div>
+                                <p class="font-semibold text-gray-900 text-sm sm:text-base">Your Rank</p>
+                                <p class="text-xs sm:text-sm text-gray-500" id="your-rank-value">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xl sm:text-2xl font-bold text-orange-600" id="your-rank-position">#--</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leaderboard List -->
+                <div id="leaderboard-list" class="space-y-1.5 sm:space-y-2">
+                    <p class="text-center text-gray-400 py-6 sm:py-8 text-sm">Loading leaderboard...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Type Selection Modal -->
+        <div id="quizTypeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
+                <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-4 text-center relative">
+                    <h3 class="text-lg font-bold text-white">Start Quiz</h3>
+                    <button onclick="closeQuizTypeModal()" class="absolute top-3 right-3 w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/40 transition-colors">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-5">
+                    <!-- Source -->
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide shrink-0">Source</span>
+                        <div class="flex gap-1.5 flex-1">
+                            <button onclick="setQuizSource('learned')" id="srcLearned" class="flex-1 py-2 px-3 rounded-lg border border-violet-500 bg-violet-50 text-violet-700 text-sm font-semibold transition-all">
+                                Learned
+                            </button>
+                            <button onclick="setQuizSource('random')" id="srcRandom" class="flex-1 py-2 px-3 rounded-lg border border-gray-200 text-gray-500 text-sm font-semibold transition-all hover:border-gray-400">
+                                Random
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Format -->
+                    <div class="space-y-2.5">
+                        <button onclick="startQuiz('bengali')" class="w-full flex items-center gap-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-4 py-3.5 rounded-xl font-semibold hover:from-violet-600 hover:to-purple-700 transition-all shadow-md active:scale-[0.98]">
+                            <span class="text-xl">🇧🇩</span>
+                            <div class="text-left">
+                                <span class="block text-sm font-bold">Bengali Meaning</span>
+                                <span class="block text-xs text-purple-200">English → Bengali</span>
+                            </div>
+                        </button>
+                        <button onclick="startQuiz('english')" class="w-full flex items-center gap-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-3.5 rounded-xl font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all shadow-md active:scale-[0.98]">
+                            <span class="text-xl">EN</span>
+                            <div class="text-left">
+                                <span class="block text-sm font-bold">English Meaning</span>
+                                <span class="block text-xs text-blue-200">Bengali → English</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <button onclick="closeQuizTypeModal()" class="w-full mt-4 text-gray-500 py-2 text-sm font-medium hover:text-gray-700 transition-colors">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Modal -->
+        <div id="quizModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <!-- Quiz Header -->
+                <div class="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-5 py-3.5 shrink-0">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-base">Quiz</span>
+                        <button onclick="closeQuiz()" class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center hover:bg-white/40 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between text-sm mb-2">
+                        <span class="text-purple-200">Question <span class="text-white font-bold" id="quizCurrent">1</span><span class="text-purple-300"> / </span><span id="quizTotal" class="text-purple-200">10</span></span>
+                        <div class="flex items-center gap-1.5 bg-white/20 rounded-full px-2.5 py-1">
+                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                            <span class="font-bold text-sm" id="quizScore">0</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-white/20 rounded-full h-1.5">
+                        <div id="quizProgress" class="bg-white h-1.5 rounded-full transition-all duration-500 ease-out" style="width: 10%"></div>
+                    </div>
+                </div>
+
+                <!-- Quiz Body -->
+                <div id="quizBody" class="p-5 overflow-y-auto flex-1">
+                    <div class="text-center mb-5">
+                        <p id="quizPrompt" class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">What is the Bengali meaning of:</p>
+                        <p id="quizWord" class="text-3xl font-extrabold text-gray-900 mb-1 leading-tight"></p>
+                        <p id="quizPhonetic" class="text-violet-400 text-sm"></p>
+                    </div>
+                    <div id="quizOptions" class="space-y-2.5"></div>
+                    <div id="quizFeedback" class="hidden mt-3 p-3 rounded-xl text-center font-semibold text-sm"></div>
+                    <button id="quizNextBtn" onclick="nextQuestion()" class="hidden w-full mt-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3 rounded-xl font-bold hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md active:scale-[0.98]">
+                        Next Question →
+                    </button>
+                </div>
+
+                <!-- Quiz Results -->
+                <div id="quizResults" class="hidden p-5 overflow-y-auto flex-1">
+                    <div class="text-center">
+                        <!-- Score Circle -->
+                        <div class="relative w-32 h-32 mx-auto mb-4">
+                            <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+                                <circle cx="60" cy="60" r="54" fill="none" stroke="#f3f4f6" stroke-width="6"/>
+                                <circle id="scoreCircle" cx="60" cy="60" r="54" fill="none" stroke="url(#scoreGrad)" stroke-width="6" stroke-linecap="round" stroke-dasharray="339.292" stroke-dashoffset="339.292" class="transition-all duration-1000 ease-out"/>
+                                <defs><linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient></defs>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-3xl font-extrabold text-gray-900" id="resultScore">0</span>
+                                <span class="text-xs text-gray-400 font-medium">%</span>
+                            </div>
+                        </div>
+
+                        <h3 class="text-xl font-bold text-gray-900 mb-1" id="resultTitle">Quiz Complete!</h3>
+                        <p class="text-gray-500 text-sm mb-3"><span id="resultCorrect">0</span> of <span id="resultTotal">10</span> correct</p>
+
+                        <div id="resultRecord" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <span class="text-lg">🏆</span>
+                                <p class="text-amber-800 font-bold text-sm">New High Score!</p>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-gray-400 mb-5">Best: <span id="resultHighScore" class="font-bold text-gray-600">0</span>%</p>
+
+                        <div class="flex gap-3">
+                            <button onclick="startQuiz()" class="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3 rounded-xl font-bold hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md active:scale-[0.98]">
+                                Play Again
+                            </button>
+                            <button onclick="closeQuiz()" class="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200 transition-all active:scale-[0.98]">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Account Info -->
+        <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">👤 Account Information</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                    <p class="text-sm text-gray-500">Name</p>
+                    <p class="font-medium text-gray-900">{{ user.name }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Email</p>
+                    <p class="font-medium text-gray-900">{{ user.email }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Phone</p>
+                    <p class="font-medium text-gray-900">{{ user.phone }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">WhatsApp Number</p>
+                    <p class="font-medium text-gray-900">{{ user.whatsapp_number }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Member Since</p>
+                    <p class="font-medium text-gray-900">{{ user.created_at[:10] }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Subscription</p>
+                    <p class="font-medium {% if user.is_paid %}text-green-600{% else %}text-yellow-600{% endif %}">
+                        {% if user.is_paid %}Paid{% if user.paid_date %} (since {{ user.paid_date[:10] }}){% endif %}{% else %}Trial (ends {{ user.trial_ends }}){% endif %}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Message Time</p>
+                    <p class="font-medium text-gray-900">{{ user.preferred_time }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Word Category</p>
+                    <p class="font-medium text-gray-900 uppercase">{{ user.preferred_category }}</p>
+                </div>
+            </div>
+            
+            <!-- Edit Profile Link -->
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <a href="/profile" class="inline-flex items-center text-blue-600 hover:text-blue-800">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Edit Profile Settings
+                </a>
+            </div>
+        </div>
+        
+        <!-- Logout -->
+        <div class="mt-8 text-center">
+            <a href="/logout" class="text-gray-500 hover:text-red-600">Sign Out</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load progress data
+    fetch('/api/progress')
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' && data.progress) {
+                const p = data.progress;
+                document.getElementById('streakCount').textContent = p.streak || 0;
+                document.getElementById('totalWords').textContent = p.total_words || 0;
+                document.getElementById('wordsSent').textContent = p.words_sent || 0;
+                
+                // Calculate progress (monthly goal: 300 words)
+                const percent = Math.min(Math.round((p.total_words / 300) * 100), 100);
+                document.getElementById('progressBar').style.width = percent + '%';
+                document.getElementById('progressPercent').textContent = percent + '%';
+            }
+        })
+        .catch(err => console.log('Progress load error:', err));
+
+    const saveTimeBtn = document.getElementById('saveTimeBtn');
+    const preferredTime = document.getElementById('preferredTime');
+    const timeMessage = document.getElementById('timeMessage');
+    const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+    const timePresets = document.querySelectorAll('.time-preset');
+
+    // Format time for display (24h to 12h)
+    function formatTime12h(time24) {
+        const [h, m] = time24.split(':');
+        const hour = parseInt(h);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        return hour12 + ':' + m + ' ' + ampm;
+    }
+
+    // Highlight active preset
+    function updateActivePreset(time) {
+        timePresets.forEach(btn => {
+            if (btn.dataset.time === time) {
+                btn.classList.add('bg-indigo-100', 'border-indigo-400', 'text-indigo-700');
+                btn.classList.remove('bg-gray-50', 'border-gray-200', 'text-gray-700');
+            } else {
+                btn.classList.remove('bg-indigo-100', 'border-indigo-400', 'text-indigo-700');
+                btn.classList.add('bg-gray-50', 'border-gray-200', 'text-gray-700');
+            }
+        });
+    }
+    updateActivePreset(preferredTime.value);
+
+    // Preset button clicks
+    timePresets.forEach(btn => {
+        btn.addEventListener('click', function() {
+            preferredTime.value = this.dataset.time;
+            updateActivePreset(this.dataset.time);
+        });
+    });
+
+    // Save time preference
+    saveTimeBtn.addEventListener('click', async function() {
+        saveTimeBtn.disabled = true;
+        saveTimeBtn.innerHTML = '<span class="animate-pulse">Saving...</span>';
+
+        try {
+            const response = await fetch('/api/update-time', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ preferred_time: preferredTime.value })
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                timeMessage.className = 'text-center p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200';
+                timeMessage.textContent = 'Time saved! Words will arrive at ' + formatTime12h(preferredTime.value);
+                timeMessage.classList.remove('hidden');
+                currentTimeDisplay.textContent = preferredTime.value;
+                updateActivePreset(preferredTime.value);
+                setTimeout(() => timeMessage.classList.add('hidden'), 3000);
+            } else {
+                timeMessage.className = 'text-center p-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+                timeMessage.textContent = 'Error saving time';
+                timeMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            timeMessage.className = 'text-center p-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+            timeMessage.textContent = 'Error saving time';
+            timeMessage.classList.remove('hidden');
+        }
+
+        saveTimeBtn.disabled = false;
+        saveTimeBtn.innerHTML = 'Save';
+    });
+
+    // Save category preference
+    const saveCategoryBtn = document.getElementById('saveCategoryBtn');
+    const preferredCategory = document.getElementById('preferredCategory');
+    const categoryMessage = document.getElementById('categoryMessage');
+    const currentCategoryDisplay = document.getElementById('currentCategoryDisplay');
+
+    saveCategoryBtn.addEventListener('click', async function() {
+        if (preferredCategory.value === '{{ user.preferred_category }}') {
+            categoryMessage.className = 'text-center p-3 rounded-lg text-sm bg-yellow-50 text-yellow-700 border border-yellow-200';
+            categoryMessage.textContent = 'You are already in this category.';
+            categoryMessage.classList.remove('hidden');
+            return;
+        }
+        saveCategoryBtn.disabled = true;
+        saveCategoryBtn.innerHTML = '<span class="animate-pulse">Sending...</span>';
+
+        try {
+            const response = await fetch('/api/update-category', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ preferred_category: preferredCategory.value })
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                categoryMessage.className = 'text-center p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200';
+                categoryMessage.textContent = data.message || 'Category saved!';
+                categoryMessage.classList.remove('hidden');
+                currentCategoryDisplay.textContent = preferredCategory.value.toUpperCase();
+                setTimeout(() => categoryMessage.classList.add('hidden'), 5000);
+            } else {
+                categoryMessage.className = 'text-center p-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+                categoryMessage.textContent = data.message || 'Error saving category';
+                categoryMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            categoryMessage.className = 'text-center p-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+            categoryMessage.textContent = 'Error saving category';
+            categoryMessage.classList.remove('hidden');
+        }
+
+        saveCategoryBtn.disabled = false;
+        saveCategoryBtn.innerHTML = 'Request Change';
+    });
+
+    // Load contest data
+    loadContestData();
+});
+
+async function loadContestData() {
+    try {
+        const response = await fetch('/api/contests/current');
+        const data = await response.json();
+
+        if (data.status === 'success' && data.contest) {
+            const contest = data.contest;
+            const widget = document.getElementById('contest-widget');
+
+            document.getElementById('contest-name').textContent = contest.name;
+            document.getElementById('contest-questions').textContent = contest.question_count;
+
+            const startTime = new Date(contest.start_time);
+            const endTime = new Date(contest.end_time);
+            const options = { month: 'short', day: 'numeric' };
+            document.getElementById('contest-dates').textContent =
+                `${startTime.toLocaleDateString('en-US', options)} ${startTime.getDate()} - ${endTime.toLocaleDateString('en-US', options)} ${endTime.getDate()}`;
+
+            const statusBadge = document.getElementById('contest-status-badge');
+            const participateBtn = document.getElementById('contest-participate-btn');
+            const leaderboardBtn = document.getElementById('contest-leaderboard-btn');
+            const contestMessage = document.getElementById('contest-message');
+
+            if (contest.status === 'upcoming') {
+                statusBadge.textContent = '🔓 Coming Soon';
+                statusBadge.className = 'px-3 py-1 bg-yellow-500/30 rounded-full text-xs font-medium';
+                participateBtn.textContent = 'Coming Friday';
+                participateBtn.className = 'px-6 py-3 bg-white/20 text-white rounded-xl font-medium cursor-not-allowed';
+                participateBtn.onclick = null;
+                participateBtn.href = '#';
+            } else if (contest.status === 'active') {
+                statusBadge.textContent = '🔥 Live Now';
+                statusBadge.className = 'px-3 py-1 bg-green-500/30 rounded-full text-xs font-medium';
+                participateBtn.textContent = 'Join Challenge';
+                participateBtn.href = '/contest/' + contest.id;
+                leaderboardBtn.classList.remove('hidden');
+                updateContestTimer(contest.time_remaining_seconds);
+            } else {
+                statusBadge.textContent = '✅ Completed';
+                statusBadge.className = 'px-3 py-1 bg-gray-500/30 rounded-full text-xs font-medium';
+                participateBtn.textContent = 'Contest Ended';
+                participateBtn.className = 'px-6 py-3 bg-white/20 text-white rounded-xl font-medium cursor-not-allowed';
+                participateBtn.onclick = null;
+                participateBtn.href = '#';
+                leaderboardBtn.href = '#leaderboard-section';
+                document.getElementById('contest-hours').textContent = '0';
+            }
+        } else {
+            document.getElementById('contest-name').textContent = 'No Contest';
+            document.getElementById('contest-dates').textContent = 'Check back soon!';
+            document.getElementById('contest-status-badge').textContent = 'No Contest';
+            document.getElementById('contest-participate-btn').textContent = 'No Contest';
+            document.getElementById('contest-participate-btn').className = 'px-6 py-3 bg-white/20 text-white rounded-xl font-medium cursor-not-allowed';
+            document.getElementById('contest-participate-btn').onclick = null;
+            document.getElementById('contest-participate-btn').href = '#';
+        }
+    } catch (error) {
+        console.log('Error loading contest:', error);
+    }
+}
+
+function updateContestTimer(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    document.getElementById('contest-hours').textContent = hours;
+
+    if (seconds > 0) {
+        setTimeout(() => {
+            loadContestData();
+        }, 60000);
+    }
+}
+
+// ==================== QUIZ ====================
+let quizQuestions = [];
+let quizIndex = 0;
+let quizScoreVal = 0;
+let quizAnswered = false;
+let quizType = 'bengali';
+let quizSource = 'learned';
+let questionChances = 0;
+const MAX_CHANCES = 2;
+
+function showQuizTypeModal() {
+    document.getElementById('quizTypeModal').classList.remove('hidden');
+}
+
+function closeQuizTypeModal() {
+    document.getElementById('quizTypeModal').classList.add('hidden');
+}
+
+function setQuizSource(source) {
+    quizSource = source;
+    const learnedBtn = document.getElementById('srcLearned');
+    const randomBtn = document.getElementById('srcRandom');
+    if (source === 'learned') {
+        learnedBtn.className = 'quiz-source-btn active-source py-3 px-4 rounded-xl border-2 border-violet-500 bg-violet-50 text-violet-700 text-sm font-bold transition-all hover:shadow-md';
+        randomBtn.className = 'quiz-source-btn py-3 px-4 rounded-xl border-2 border-gray-200 text-gray-500 text-sm font-bold transition-all hover:border-gray-400 hover:shadow-md';
+    } else {
+        randomBtn.className = 'quiz-source-btn active-source py-3 px-4 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-700 text-sm font-bold transition-all hover:shadow-md';
+        learnedBtn.className = 'quiz-source-btn py-3 px-4 rounded-xl border-2 border-gray-200 text-gray-500 text-sm font-bold transition-all hover:border-gray-400 hover:shadow-md';
+    }
+}
+
+async function startQuiz(type) {
+    closeQuizTypeModal();
+    quizType = type || 'bengali';
+    try {
+        const resp = await fetch('/api/quiz/start?type=' + quizType + '&source=' + quizSource);
+        const data = await resp.json();
+        if (data.status !== 'success') {
+            alert(data.message || 'Could not start quiz');
+            return;
+        }
+        quizQuestions = data.questions;
+        quizIndex = 0;
+        quizScoreVal = 0;
+        questionChances = 0;
+        document.getElementById('quizTotal').textContent = quizQuestions.length;
+        document.getElementById('quizScore').textContent = '0';
+        document.getElementById('quizResults').classList.add('hidden');
+        document.getElementById('quizBody').classList.remove('hidden');
+        showQuestion();
+        document.getElementById('quizModal').classList.remove('hidden');
+    } catch (e) {
+        alert('Error starting quiz');
+    }
+}
+
+function showQuestion() {
+    const q = quizQuestions[quizIndex];
+    questionChances = 0;
+    document.getElementById('quizCurrent').textContent = quizIndex + 1;
+    document.getElementById('quizProgress').style.width = ((quizIndex + 1) / quizQuestions.length * 100) + '%';
+    document.getElementById('quizFeedback').classList.add('hidden');
+    document.getElementById('quizNextBtn').classList.add('hidden');
+    quizAnswered = false;
+
+    const promptEl = document.getElementById('quizPrompt');
+    const wordEl = document.getElementById('quizWord');
+    const phoneticEl = document.getElementById('quizPhonetic');
+
+    if (quizType === 'english') {
+        promptEl.textContent = 'What is the English word for:';
+        wordEl.textContent = q.correct;
+        phoneticEl.textContent = '';
+    } else {
+        promptEl.textContent = 'What is the Bengali meaning of:';
+        wordEl.textContent = q.word;
+        phoneticEl.textContent = q.phonetic || '';
+    }
+
+    renderOptions(q);
+}
+
+function renderOptions(q) {
+    const optionsDiv = document.getElementById('quizOptions');
+    let options, correctAnswer;
+
+    if (quizType === 'english') {
+        options = q.english_options || [q.word];
+        correctAnswer = q.word;
+    } else {
+        options = q.options;
+        correctAnswer = q.correct;
+    }
+
+    const letters = ['A', 'B', 'C', 'D'];
+    optionsDiv.innerHTML = options.map((opt, i) => `
+        <button onclick="selectAnswer(this, '${opt.replace(/'/g, "\\'").replace(/\n/g, " ")}', '${correctAnswer.replace(/'/g, "\\'").replace(/\n/g, " ")}')"
+            class="quiz-opt quiz-option w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition-all font-medium text-gray-800 text-left">
+            <span class="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 shrink-0">${letters[i]}</span>
+            <span class="flex-1 text-sm">${opt}</span>
+        </button>
+    `).join('');
+}
+
+function selectAnswer(btn, selected, correct) {
+    if (quizAnswered) return;
+
+    const isCorrect = selected === correct;
+    const feedback = document.getElementById('quizFeedback');
+
+    if (isCorrect) {
+        quizAnswered = true;
+        quizScoreVal++;
+        document.getElementById('quizScore').textContent = quizScoreVal;
+
+        btn.classList.add('correct-opt');
+        document.querySelectorAll('.quiz-option').forEach(b => {
+            b.onclick = null;
+            if (b !== btn) b.classList.add('disabled-opt');
+        });
+
+        feedback.className = 'mt-4 p-4 rounded-2xl text-center font-bold text-sm bg-green-50 text-green-700 border border-green-200';
+        feedback.innerHTML = '<span class="text-lg">✓</span> Correct!';
+        feedback.classList.remove('hidden');
+
+        const delay = quizIndex < quizQuestions.length - 1 ? 700 : 800;
+        if (quizIndex < quizQuestions.length - 1) {
+            setTimeout(() => { quizIndex++; showQuestion(); }, delay);
+        } else {
+            setTimeout(submitQuiz, delay);
+        }
+    } else {
+        questionChances++;
+        btn.classList.add('wrong-opt');
+        btn.onclick = null;
+
+        if (questionChances < MAX_CHANCES) {
+            const remaining = MAX_CHANCES - questionChances;
+            feedback.className = 'mt-4 p-4 rounded-2xl text-center font-bold text-sm bg-amber-50 text-amber-700 border border-amber-200';
+            feedback.innerHTML = `Not quite! <span class="font-extrabold">${remaining}</span> more chance${remaining > 1 ? 's' : ''} left.`;
+            feedback.classList.remove('hidden');
+        } else {
+            quizAnswered = true;
+            document.querySelectorAll('.quiz-option').forEach(b => {
+                const text = b.querySelector('span:last-child').textContent.trim();
+                if (text === correct) {
+                    b.classList.add('correct-opt');
+                }
+                b.onclick = null;
+                if (!b.classList.contains('correct-opt')) b.classList.add('disabled-opt');
+            });
+
+            feedback.className = 'mt-4 p-4 rounded-2xl text-center font-bold text-sm bg-red-50 text-red-700 border border-red-200';
+            feedback.innerHTML = `Answer: <span class="font-extrabold">${correct}</span>`;
+            feedback.classList.remove('hidden');
+
+            const delay = quizIndex < quizQuestions.length - 1 ? 1500 : 1500;
+            if (quizIndex < quizQuestions.length - 1) {
+                setTimeout(() => { quizIndex++; showQuestion(); }, delay);
+            } else {
+                setTimeout(submitQuiz, delay);
+            }
+        }
+    }
+}
+
+function nextQuestion() {
+    quizIndex++;
+    showQuestion();
+}
+
+async function submitQuiz() {
+    const total = quizQuestions.length;
+    const percentage = Math.round((quizScoreVal / total) * 100);
+
+    try {
+        const resp = await fetch('/api/quiz/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ score: quizScoreVal, total: total })
+        });
+        const data = await resp.json();
+
+        document.getElementById('resultHighScore').textContent = data.high_score || percentage;
+        if (data.new_record) {
+            document.getElementById('resultRecord').classList.remove('hidden');
+            document.getElementById('quizHighScore').textContent = data.high_score + '%';
+        } else {
+            document.getElementById('resultRecord').classList.add('hidden');
+        }
+    } catch (e) {
+        document.getElementById('resultHighScore').textContent = percentage;
+    }
+
+    document.getElementById('quizBody').classList.add('hidden');
+    document.getElementById('quizResults').classList.remove('hidden');
+    document.getElementById('resultScore').textContent = percentage;
+    document.getElementById('resultCorrect').textContent = quizScoreVal;
+    document.getElementById('resultTotal').textContent = total;
+
+    // Set result title based on score
+    const titleEl = document.getElementById('resultTitle');
+    if (percentage >= 90) titleEl.textContent = 'Excellent! 🌟';
+    else if (percentage >= 70) titleEl.textContent = 'Great Job! 🎯';
+    else if (percentage >= 50) titleEl.textContent = 'Good Effort! 💪';
+    else titleEl.textContent = 'Keep Practicing! 📚';
+
+    // Animate score circle
+    setTimeout(() => {
+        const circle = document.getElementById('scoreCircle');
+        const circumference = 2 * Math.PI * 54;
+        const offset = circumference - (percentage / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+    }, 100);
+}
+
+function closeQuiz() {
+    document.getElementById('quizModal').classList.add('hidden');
+}
+
+// ==================== LEADERBOARD ====================
+let currentLbType = 'weekly';
+
+async function loadLeaderboard(type) {
+    currentLbType = type;
+
+    // Update tab styles
+    document.querySelectorAll('.lb-tab').forEach(tab => {
+        tab.className = 'lb-tab px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap';
+    });
+    document.getElementById('lb-' + type).className = 'lb-tab px-4 py-2 rounded-lg text-sm font-semibold bg-orange-100 text-orange-700 transition whitespace-nowrap';
+
+    try {
+        const resp = await fetch(`/api/leaderboard?type=${type}`);
+        const data = await resp.json();
+
+        if (data.status === 'success') {
+            renderLeaderboard(data.leaderboard, data.user_rank, type);
+        }
+    } catch (e) {
+        console.error('Failed to load leaderboard:', e);
+    }
+}
+
+function renderLeaderboard(leaderboard, userRank, type) {
+    const listEl = document.getElementById('leaderboard-list');
+    const yourRankEl = document.getElementById('your-rank-position');
+    const yourValueEl = document.getElementById('your-rank-value');
+
+    const suffix = type === 'weekly' ? 'words' : type === 'monthly' ? 'words' : type === 'streak' ? 'days' : 'words';
+    const label = type === 'weekly' ? 'this week' : type === 'monthly' ? 'this month' : type === 'streak' ? 'day streak' : 'total';
+
+    if (userRank) {
+        yourRankEl.textContent = '#' + userRank.rank;
+        yourValueEl.textContent = `${userRank.value} ${suffix} ${label}`;
+    }
+
+    if (leaderboard.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-gray-400 py-8">No rankings yet. Start learning to climb the leaderboard!</p>';
+        return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    listEl.innerHTML = leaderboard.map((entry, i) => {
+        const rank = i + 1;
+        const medal = rank <= 3 ? medals[rank - 1] : `<span class="text-gray-400 text-sm font-medium">${rank}</span>`;
+        const bgClass = rank <= 3 ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-orange-200' : 'bg-white border-gray-100';
+
+        return `
+            <div class="flex items-center justify-between p-3 rounded-xl border ${bgClass}">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 text-center">${medal}</div>
+                    <p class="font-medium text-gray-900 text-sm">${entry.name}</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold text-gray-900">${entry.value}</p>
+                    <p class="text-xs text-gray-500">${suffix}</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Load leaderboard on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadLeaderboard('weekly');
+});
+</script>
+{% endblock %}

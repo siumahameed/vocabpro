@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>{% block title %}{{ seo_title }}{% endblock %}</title>
+    <meta name="description" content="{{ seo_description }}">
+    <meta name="keywords" content="vocabulary, english learning, whatsapp, bangladesh, ielts, gre, daily words">
+    <meta name="author" content="Sium">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="VocabPro - Learn English via WhatsApp">
+    <meta property="og:description" content="10 new vocabulary words daily with Bengali meanings. Start free!">
+    <meta property="og:url" content="https://vocabpro.com">
+    <meta property="og:image" content="/static/logo.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="VocabPro - Learn English via WhatsApp">
+    <meta property="twitter:description" content="10 new vocabulary words daily with Bengali meanings. Start free!">
+    <meta property="twitter:image" content="/static/logo.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/style.css">
+    
+    <style>
+        :root {
+            --primary: #2196F3;
+            --secondary: #4CAF50;
+            --dark: #1a1a1a;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-primary {
+            background-color: var(--primary);
+        }
+        .btn-primary:hover {
+            background-color: #1976D2;
+        }
+        .text-primary { color: var(--primary); }
+        .text-secondary { color: var(--secondary); }
+
+        /* ===== C_ium Chat Widget — Modern Design ===== */
+
+        /* Floating Button */
+        .chat-fab {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 32px rgba(99,102,241,0.35), 0 0 0 0 rgba(99,102,241,0.3);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+            animation: fabPulse 2.5s infinite;
+        }
+        .chat-fab:hover {
+            transform: scale(1.12);
+            box-shadow: 0 12px 40px rgba(99,102,241,0.45);
+            animation: none;
+        }
+        @keyframes fabPulse {
+            0%, 100% { box-shadow: 0 8px 32px rgba(99,102,241,0.35), 0 0 0 0 rgba(99,102,241,0.3); }
+            50% { box-shadow: 0 8px 32px rgba(99,102,241,0.35), 0 0 0 12px rgba(99,102,241,0); }
+        }
+        .chat-fab .fab-label {
+            position: absolute;
+            bottom: 72px;
+            right: 0;
+            background: white;
+            color: #1e1b4b;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+        .chat-fab:hover .fab-label {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Chat Window */
+        .cw-window {
+            position: fixed;
+            bottom: 108px;
+            right: 28px;
+            width: 400px;
+            height: 580px;
+            background: #fafafa;
+            border-radius: 24px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.1);
+            z-index: 9998;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            animation: chatSlideUp 0.35s cubic-bezier(0.4,0,0.2,1);
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        .cw-window.cw-open { display: flex; }
+        .cw-window-prompt {
+            position: fixed;
+            bottom: 108px;
+            right: 28px;
+            width: 400px;
+            background: #fafafa;
+            border-radius: 24px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.1);
+            z-index: 9998;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            animation: chatSlideUp 0.35s cubic-bezier(0.4,0,0.2,1);
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        .cw-window-prompt.cw-open { display: flex; }
+        @keyframes chatSlideUp {
+            from { opacity: 0; transform: translateY(24px) scale(0.92); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Header */
+        .cw-header {
+            background: linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .cw-header-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        .cw-header-info h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.3px;
+        }
+        .cw-header-info p {
+            font-size: 11px;
+            color: rgba(255,255,255,0.75);
+            margin-top: 1px;
+        }
+        .cw-header-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .cw-header-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .cw-header-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* Mode Selector */
+        .cw-mode-bar {
+            display: flex;
+            gap: 6px;
+            padding: 12px 16px;
+            background: white;
+            border-bottom: 1px solid #f1f1f1;
+            flex-shrink: 0;
+        }
+        .cw-mode-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 2px solid #f1f1f1;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .cw-mode-btn:hover { border-color: #e0e7ff; color: #6366f1; background: #f5f3ff; }
+        .cw-mode-btn.active {
+            border-color: #6366f1;
+            background: #f5f3ff;
+            color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+
+        /* Messages Area */
+        #cwMessages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background: linear-gradient(180deg, #f8f9ff 0%, #fafafa 100%);
+        }
+        #cwMessages::-webkit-scrollbar { width: 5px; }
+        #cwMessages::-webkit-scrollbar-track { background: transparent; }
+        #cwMessages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+
+        /* Message Bubbles */
+        .cw-msg-user {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+            animation: msgFadeIn 0.3s ease-out;
+        }
+        .cw-msg-user .cw-bubble {
+            background: linear-gradient(135deg, #6366f1, #7c3aed);
+            color: white;
+            border-radius: 18px 18px 4px 18px;
+            padding: 10px 16px;
+            max-width: 80%;
+            font-size: 13.5px;
+            line-height: 1.5;
+            box-shadow: 0 2px 12px rgba(99,102,241,0.2);
+        }
+        .cw-msg-bot {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 12px;
+            animation: msgFadeIn 0.3s ease-out;
+        }
+        .cw-msg-bot .cw-bubble {
+            background: white;
+            color: #1f2937;
+            border-radius: 18px 18px 18px 4px;
+            padding: 10px 16px;
+            max-width: 80%;
+            font-size: 13.5px;
+            line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #f3f4f6;
+        }
+        .cw-msg-bot .cw-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        @keyframes msgFadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Typing Indicator */
+        .cw-typing-dot {
+            width: 7px;
+            height: 7px;
+            background: #a78bfa;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: cwTypingBounce 1.4s infinite;
+        }
+        .cw-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .cw-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes cwTypingBounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        /* Input Area */
+        .cw-input-bar {
+            padding: 14px 16px;
+            background: white;
+            border-top: 1px solid #f1f1f1;
+            flex-shrink: 0;
+        }
+        .cw-input-wrap {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 6px 6px 6px 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .cw-input-wrap:focus-within {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+            background: white;
+        }
+        .cw-input-wrap textarea {
+            flex: 1;
+            border: none;
+            background: transparent;
+            resize: none;
+            font-size: 13.5px;
+            color: #1f2937;
+            padding: 8px 0;
+            max-height: 80px;
+            outline: none;
+            font-family: 'Inter', sans-serif;
+        }
+        .cw-input-wrap textarea::placeholder { color: #9ca3af; }
+        .cw-send-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #6366f1, #7c3aed);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .cw-send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        .cw-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Welcome Card */
+        .cw-welcome-card {
+            background: linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .cw-welcome-card .cw-logo-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            box-shadow: 0 8px 20px rgba(99,102,241,0.25);
+        }
+        .cw-welcome-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e1b4b;
+            margin-bottom: 4px;
+        }
+        .cw-welcome-card p {
+            font-size: 12.5px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        /* Mobile */
+        @media (max-width: 640px) {
+            .cw-window, .cw-window-prompt {
+                bottom: 0; right: 0; left: 0;
+                width: 100%; height: 100%;
+                border-radius: 0;
+            }
+            .chat-fab { bottom: 16px; right: 16px; }
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <a href="/" class="flex items-center space-x-2">
+                    <span class="text-2xl font-bold">
+                        <span class="text-blue-600">Vocab</span><span class="text-green-500">Pro</span>
+                    </span>
+                </a>
+                
+                <!-- Nav Links -->
+                <div class="hidden md:flex items-center space-x-6">
+                    {% if logged_in %}
+                        <a href="/dashboard" class="text-gray-700 hover:text-blue-600 font-medium">Dashboard</a>
+                        <a href="/profile" class="text-gray-700 hover:text-blue-600 font-medium">Profile</a>
+                        <a href="/payment" class="text-gray-700 hover:text-blue-600 font-medium">Payment</a>
+                        <a href="/logout" class="bg-red-500 text-white px-5 py-2 rounded-full font-medium hover:bg-red-600 transition">Logout</a>
+                    {% else %}
+                        <a href="/" class="text-gray-700 hover:text-blue-600 font-medium">Home</a>
+                        <a href="#features" class="text-gray-700 hover:text-blue-600 font-medium">Features</a>
+                        <a href="#pricing" class="text-gray-700 hover:text-blue-600 font-medium">Pricing</a>
+                        <a href="/login" class="text-gray-700 hover:text-blue-600 font-medium">Login</a>
+                        <a href="/signup" class="bg-blue-600 text-white px-5 py-2 rounded-full font-medium hover:bg-blue-700 transition">Sign Up</a>
+                    {% endif %}
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-btn" class="md:hidden text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t">
+            <div class="px-4 py-3 space-y-2">
+                {% if logged_in %}
+                    <a href="/dashboard" class="block py-2 text-gray-700">Dashboard</a>
+                    <a href="/profile" class="block py-2 text-gray-700">Profile</a>
+                    <a href="/payment" class="block py-2 text-gray-700">Payment</a>
+                    <a href="/logout" class="block py-2 text-red-600 font-medium">Logout</a>
+                {% else %}
+                    <a href="/" class="block py-2 text-gray-700">Home</a>
+                    <a href="#features" class="block py-2 text-gray-700">Features</a>
+                    <a href="#pricing" class="block py-2 text-gray-700">Pricing</a>
+                    <a href="/login" class="block py-2 text-gray-700">Login</a>
+                    <a href="/signup" class="block py-2 text-blue-600 font-medium">Sign Up</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <span class="text-blue-400">Vocab</span><span class="text-green-400">Pro</span>
+                    </h3>
+                    <p class="text-gray-400">Daily English vocabulary via WhatsApp for students and language learners in Bangladesh.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">Quick Links</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/" class="hover:text-white">Home</a></li>
+                        <li><a href="/signup" class="hover:text-white">Sign Up</a></li>
+                        <li><a href="/login" class="hover:text-white">Login</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">Contact</h4>
+                    <p class="text-gray-400">Email: support@vocabpro.com</p>
+                    <p class="text-gray-400">WhatsApp: Available for subscribers</p>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2026 VocabPro. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="/static/app.js"></script>
+    {% block extra_js %}{% endblock %}
+
+    <!-- Floating C_ium Button -->
+    <button id="chatFab" class="chat-fab" onclick="toggleChatWidget()">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <circle cx="9" cy="10" r="1" fill="currentColor"/>
+            <circle cx="15" cy="10" r="1" fill="currentColor"/>
+        </svg>
+        <span class="fab-label">Chat with C_ium</span>
+    </button>
+
+    <!-- Login Prompt for Guests -->
+    <div id="chatLoginPrompt" class="cw-window-prompt" style="max-height: 380px;">
+        <div class="cw-header">
+            <div class="flex items-center gap-3">
+                <div class="cw-header-avatar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="white"/><circle cx="15" cy="10" r="1" fill="white"/></svg>
+                </div>
+                <div class="cw-header-info">
+                    <h3>C_ium</h3>
+                    <p>AI English Companion</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('chatLoginPrompt').classList.remove('cw-open'); document.getElementById('chatFab').innerHTML='<svg width=&quot;30&quot; height=&quot;30&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z&quot;/><circle cx=&quot;9&quot; cy=&quot;10&quot; r=&quot;1&quot; fill=&quot;currentColor&quot;/><circle cx=&quot;15&quot; cy=&quot;10&quot; r=&quot;1&quot; fill=&quot;currentColor&quot;/></svg><span class=&quot;fab-label&quot;>Chat with C_ium</span>';" class="cw-header-btn">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="p-6 text-center">
+            <div class="cw-welcome-card">
+                <div class="cw-logo-circle">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="white"/><circle cx="15" cy="10" r="1" fill="white"/></svg>
+                </div>
+                <h4>Hi! I'm C_ium</h4>
+                <p>Your AI English companion — chat, learn grammar, prepare for IELTS/GRE, and improve your English.</p>
+            </div>
+            <a href="/login" class="block w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 rounded-xl font-semibold transition mb-2 text-sm shadow-lg shadow-indigo-200">Login to Chat</a>
+            <a href="/signup" class="block w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium transition text-sm">Create Free Account</a>
+        </div>
+    </div>
+
+    {% if logged_in %}
+    <!-- Chat Widget for Logged-in Users -->
+    <div id="chatWidget" class="cw-window">
+        <!-- Header -->
+        <div class="cw-header">
+            <div class="flex items-center gap-3">
+                <div class="cw-header-avatar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="white"/><circle cx="15" cy="10" r="1" fill="white"/></svg>
+                </div>
+                <div class="cw-header-info">
+                    <h3>C_ium</h3>
+                    <p id="cwPersonaDesc">Friendly AI companion</p>
+                </div>
+            </div>
+            <div class="cw-header-actions">
+                <button onclick="cwClearChat()" class="cw-header-btn" title="New Chat">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                </button>
+                <button onclick="toggleChatWidget()" class="cw-header-btn" title="Close">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mode Selector -->
+        <div class="cw-mode-bar">
+            <button id="cwModeChat" onclick="cwSwitchPersona('chat')" class="cw-mode-btn active">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Chat
+            </button>
+            <button id="cwModeMentor" onclick="cwSwitchPersona('mentor')" class="cw-mode-btn">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                Mentor
+            </button>
+        </div>
+
+        <!-- Messages -->
+        <div id="cwMessages">
+            <div id="cwMessagesContainer">
+                <!-- Welcome Message -->
+                <div id="cwWelcomeMsg" class="hidden">
+                    <div class="cw-welcome-card">
+                        <div class="cw-logo-circle">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="white"/><circle cx="15" cy="10" r="1" fill="white"/></svg>
+                        </div>
+                        <h4>Hi! I'm C_ium</h4>
+                        <p id="cwWelcomeText"></p>
+                    </div>
+                </div>
+
+                <!-- Typing Indicator -->
+                <div id="cwTypingIndicator" class="hidden">
+                    <div class="cw-msg-bot">
+                        <div class="cw-avatar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <div class="cw-bubble">
+                            <span class="cw-typing-dot"></span><span class="cw-typing-dot"></span><span class="cw-typing-dot"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="cw-input-bar">
+            <div class="cw-input-wrap">
+                <textarea id="cwChatInput" rows="1" placeholder="Ask C_ium anything..."
+                    onkeydown="cwHandleKeyDown(event)" oninput="cwAutoResize(this)"></textarea>
+                <button id="cwSendBtn" onclick="cwSendMessage()" class="cw-send-btn">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+            <p class="text-center text-xs text-gray-400 mt-2">Enter to send &middot; Shift+Enter for new line</p>
+        </div>
+    </div>
+
+    <script>
+    const CW_FAB_OPEN = '<svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>';
+    const CW_FAB_CLOSED = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg><span class="fab-label">Chat with C_ium</span>';
+
+    let cwCurrentPersona = 'chat';
+    let cwIsWaiting = false;
+    let cwLoaded = false;
+    const CW_PERSONAS = {
+        "chat": {"description": "Friendly AI companion"},
+        "mentor": {"description": "Personal English mentor & exam coach"}
+    };
+    const CW_WELCOME = {
+        "chat": "Ask me anything — translations, grammar, or just chat!",
+        "mentor": "What are you preparing for — IELTS, GRE, or general English?"
+    };
+
+    function toggleChatWidget() {
+        const widget = document.getElementById('chatWidget');
+        const loginPrompt = document.getElementById('chatLoginPrompt');
+        const fab = document.getElementById('chatFab');
+
+        if (!widget) {
+            // Guest user
+            const isOpen = loginPrompt.classList.contains('cw-open');
+            if (isOpen) {
+                loginPrompt.classList.remove('cw-open');
+                fab.innerHTML = CW_FAB_CLOSED;
+            } else {
+                loginPrompt.classList.add('cw-open');
+                fab.innerHTML = CW_FAB_OPEN;
+            }
+            return;
+        }
+
+        // Logged-in user
+        const isOpen = widget.classList.contains('cw-open');
+        if (isOpen) {
+            widget.classList.remove('cw-open');
+            fab.innerHTML = CW_FAB_CLOSED;
+        } else {
+            widget.classList.add('cw-open');
+            fab.innerHTML = CW_FAB_OPEN;
+            if (!cwLoaded) { cwLoadHistory(); cwLoaded = true; }
+            setTimeout(() => document.getElementById('cwChatInput').focus(), 300);
+        }
+    }
+
+    async function cwLoadHistory() {
+        try {
+            const response = await fetch(`/api/chatbot/history?persona=${cwCurrentPersona}`);
+            const data = await response.json();
+            if (data.status === 'success' && data.messages.length > 0) {
+                document.getElementById('cwWelcomeMsg').classList.add('hidden');
+                data.messages.forEach(msg => cwAppendMessage(msg.role, msg.content, false));
+                cwScrollToBottom();
+            } else {
+                cwShowWelcome();
+            }
+        } catch (e) {
+            cwShowWelcome();
+        }
+    }
+
+    function cwShowWelcome() {
+        const welcomeEl = document.getElementById('cwWelcomeMsg');
+        const welcomeText = document.getElementById('cwWelcomeText');
+        welcomeText.textContent = CW_WELCOME[cwCurrentPersona] || CW_WELCOME['chat'];
+        welcomeEl.classList.remove('hidden');
+        cwScrollToBottom();
+    }
+
+    async function cwSendMessage() {
+        const input = document.getElementById('cwChatInput');
+        const message = input.value.trim();
+        if (!message || cwIsWaiting) return;
+
+        document.getElementById('cwWelcomeMsg').classList.add('hidden');
+        cwAppendMessage('user', message, true);
+        input.value = '';
+        cwAutoResize(input);
+
+        cwIsWaiting = true;
+        document.getElementById('cwSendBtn').disabled = true;
+        input.disabled = true;
+        cwShowTyping();
+        cwScrollToBottom();
+
+        try {
+            const response = await fetch('/api/chatbot/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: message, persona: cwCurrentPersona})
+            });
+            const data = await response.json();
+            cwHideTyping();
+            if (data.status === 'success') {
+                cwAppendMessage('assistant', data.response, true);
+            } else {
+                cwAppendMessage('assistant', 'Sorry, something went wrong. Please try again.', true);
+            }
+        } catch (e) {
+            cwHideTyping();
+            cwAppendMessage('assistant', 'Network error. Please try again.', true);
+        }
+
+        cwIsWaiting = false;
+        document.getElementById('cwSendBtn').disabled = false;
+        input.disabled = false;
+        input.focus();
+        cwScrollToBottom();
+    }
+
+    function cwAppendMessage(role, content, animate) {
+        const container = document.getElementById('cwMessagesContainer');
+        const typingEl = document.getElementById('cwTypingIndicator');
+        const div = document.createElement('div');
+
+        if (role === 'user') {
+            div.className = `cw-msg-user${animate ? '' : ''}`;
+            div.innerHTML = `<div class="cw-bubble">${cwEscapeHtml(content)}</div>`;
+        } else {
+            div.className = `cw-msg-bot`;
+            div.innerHTML = `<div class="cw-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="cw-bubble">${cwFormatMessage(content)}</div>`;
+        }
+
+        container.insertBefore(div, typingEl);
+    }
+
+    function cwFormatMessage(text) {
+        let escaped = cwEscapeHtml(text);
+        escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/`([^`]+)`/g, '<code style="background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:12px;font-family:monospace;">$1</code>');
+        return escaped;
+    }
+
+    function cwEscapeHtml(text) {
+        const d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
+    }
+
+    function cwShowTyping() { document.getElementById('cwTypingIndicator').classList.remove('hidden'); }
+    function cwHideTyping() { document.getElementById('cwTypingIndicator').classList.add('hidden'); }
+
+    function cwScrollToBottom() {
+        const chat = document.getElementById('cwMessages');
+        setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 50);
+    }
+
+    function cwHandleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); cwSendMessage(); }
+    }
+
+    function cwAutoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 80) + 'px';
+    }
+
+    async function cwSwitchPersona(persona) {
+        cwCurrentPersona = persona;
+        document.getElementById('cwModeChat').classList.toggle('active', persona === 'chat');
+        document.getElementById('cwModeMentor').classList.toggle('active', persona === 'mentor');
+        document.getElementById('cwPersonaDesc').textContent = CW_PERSONAS[persona].description;
+
+        const container = document.getElementById('cwMessagesContainer');
+        Array.from(container.children).forEach(el => {
+            if (el.id !== 'cwWelcomeMsg' && el.id !== 'cwTypingIndicator') el.remove();
+        });
+
+        cwLoaded = false;
+        await cwLoadHistory();
+    }
+
+    async function cwClearChat() {
+        if (!confirm('Start a new chat?')) return;
+        try {
+            await fetch('/api/chatbot/clear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({persona: cwCurrentPersona})
+            });
+            const container = document.getElementById('cwMessagesContainer');
+            Array.from(container.children).forEach(el => {
+                if (el.id !== 'cwWelcomeMsg' && el.id !== 'cwTypingIndicator') el.remove();
+            });
+            cwShowWelcome();
+        } catch (e) {
+            console.error('Clear chat error:', e);
+        }
+    }
+    </script>
+    {% endif %}
+</body>
+</html>

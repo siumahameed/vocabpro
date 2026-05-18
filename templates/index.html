@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}VocabPro - Daily English Vocabulary via WhatsApp{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white overflow-hidden">
+    <!-- Background effects -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute top-10 left-0 w-72 h-72 bg-white rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-10 w-96 h-96 bg-green-400 rounded-full blur-3xl"></div>
+    </div>
+    <!-- Grid pattern overlay -->
+    <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(circle, white 1px, transparent 1px); background-size: 30px 30px;"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 lg:py-28 relative z-10">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            <!-- Left: Text Content -->
+            <div class="space-y-6 sm:space-y-8">
+                <!-- Badge -->
+                <div class="inline-flex items-center px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium border border-white/10">
+                    <span class="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                    Trusted by 500+ learners in Bangladesh
+                </div>
+
+                <!-- Heading -->
+                <div class="space-y-4">
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight">
+                        Learn English Words <span class="text-yellow-400">Daily</span> via WhatsApp
+                    </h1>
+                </div>
+
+                <!-- Description -->
+                <p class="text-lg text-blue-100 leading-relaxed max-w-lg">
+                    Get 10 curated English words with Bengali meanings and pronunciation delivered to your WhatsApp daily. Perfect for <span class="text-white font-semibold">IELTS</span>, <span class="text-white font-semibold">GRE</span>, and academic success.
+                </p>
+
+                <!-- CTA Buttons -->
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <a href="/signup" class="inline-flex items-center justify-center bg-green-500 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-green-600 transition shadow-lg shadow-green-500/30">
+                        Start Free Trial
+                        <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                    </a>
+                    <a href="#how-it-works" class="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/20 transition border border-white/20">
+                        How It Works
+                    </a>
+                </div>
+
+                <!-- Trust signals -->
+                <div class="flex flex-wrap items-center gap-4 sm:gap-6 pt-2">
+                    <div class="flex items-center gap-2 text-blue-200 text-xs sm:text-sm">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        7-day free trial
+                    </div>
+                    <div class="flex items-center gap-2 text-blue-200 text-xs sm:text-sm">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        No credit card
+                    </div>
+                    <div class="flex items-center gap-2 text-blue-200 text-xs sm:text-sm">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Only 15 Tk/month
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Phone Mockup -->
+            <div class="hidden lg:flex justify-center">
+                <div class="relative">
+                    <!-- Phone frame -->
+                    <div class="bg-white rounded-3xl shadow-2xl p-5 w-80 border border-gray-100">
+                        <!-- WhatsApp header -->
+                        <div class="flex items-center space-x-3 mb-5 pb-4 border-b border-gray-100">
+                            <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 text-sm">VocabPro</p>
+                                <p class="text-xs text-green-500">online</p>
+                            </div>
+                        </div>
+
+                        <!-- Message bubble -->
+                        <div class="bg-green-50 rounded-2xl rounded-tl-sm p-4 mb-4">
+                            <p class="text-xs text-gray-500 mb-3">Today's Vocabulary</p>
+                            <div class="space-y-3">
+                                <div class="flex items-start gap-3">
+                                    <span class="text-blue-600 font-bold text-sm mt-0.5">1.</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-900 text-sm">Ubiquitous <span class="text-gray-400 font-normal text-xs">/juːˈbɪkwɪtəs/</span></p>
+                                        <p class="text-green-700 text-xs mt-0.5">সর্বত্র বিদ্যমান</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <span class="text-blue-600 font-bold text-sm mt-0.5">2.</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-900 text-sm">Pragmatic <span class="text-gray-400 font-normal text-xs">/præɡˈmætɪk/</span></p>
+                                        <p class="text-green-700 text-xs mt-0.5">বাস্তবসম্মত</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <span class="text-blue-600 font-bold text-sm mt-0.5">3.</span>
+                                    <div>
+                                        <p class="font-semibold text-gray-900 text-sm">Eloquent <span class="text-gray-400 font-normal text-xs">/ˈɛləkwənt/</span></p>
+                                        <p class="text-green-700 text-xs mt-0.5">বাকপটু</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-gray-400 text-xs mt-3 text-center">+7 more words</p>
+                        </div>
+
+                        <!-- Time indicator -->
+                        <div class="flex items-center justify-center gap-2 text-gray-400">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <p class="text-xs">Delivered at 9:30 AM</p>
+                        </div>
+                    </div>
+
+                    <!-- Floating badge -->
+                    <div class="absolute -bottom-4 -left-8 bg-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3">
+                        <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-900">Streak: 12 days</p>
+                            <p class="text-xs text-gray-500">120 words learned</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="py-16 sm:py-24 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
+    <div class="absolute top-0 left-0 w-72 h-72 bg-blue-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-50"></div>
+    <div class="absolute bottom-0 right-0 w-96 h-96 bg-purple-100 rounded-full translate-x-1/3 translate-y-1/3 opacity-40"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="text-center mb-10 sm:mb-16">
+            <span class="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold mb-4">Features</span>
+            <h2 class="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900">Why Choose <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">VocabPro</span>?</h2>
+            <p class="mt-3 sm:mt-4 text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">Everything you need to build a strong English vocabulary, delivered straight to your WhatsApp</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div class="group bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-green-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Daily WhatsApp Delivery</h3>
+                <p class="text-green-100 text-sm leading-relaxed">Receive 10 curated vocabulary words directly on WhatsApp every day. No app to install, no extra effort.</p>
+            </div>
+
+            <div class="group bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-blue-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Bengali Meanings & Phonetics</h3>
+                <p class="text-blue-100 text-sm leading-relaxed">Every word includes clear Bengali translations and pronunciation guides for easy understanding.</p>
+            </div>
+
+            <div class="group bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-purple-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">3 Word Categories</h3>
+                <p class="text-purple-100 text-sm leading-relaxed">IELTS, GRE, and Common words. Choose the category that matches your learning goal.</p>
+            </div>
+
+            <div class="group bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-orange-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Personalized Schedule</h3>
+                <p class="text-orange-100 text-sm leading-relaxed">Set your preferred delivery time between 11 AM and 11 PM. Learn at the hour that works best for you.</p>
+            </div>
+
+            <div class="group bg-gradient-to-br from-amber-500 to-yellow-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-yellow-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Progress Tracking</h3>
+                <p class="text-yellow-100 text-sm leading-relaxed">Track your learning streak, words learned, and earn achievements. Stay motivated every day.</p>
+            </div>
+
+            <div class="group bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-pink-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">AI-Powered Vocabulary</h3>
+                <p class="text-pink-100 text-sm leading-relaxed">Words are generated and curated using AI to ensure quality, relevance, and perfect difficulty.</p>
+            </div>
+
+            <div class="group bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white hover:shadow-2xl hover:shadow-teal-200 transition-all duration-300 hover:-translate-y-1">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-5 backdrop-blur-sm">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><path d="M9 22h6"/></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">AI Chatbot & Mentor</h3>
+                <p class="text-teal-100 text-sm leading-relaxed">Your AI-powered language coach for conversation practice, IELTS/GRE preparation, and grammar improvement.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section id="how-it-works" class="py-16 sm:py-24 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-10 sm:mb-16">
+            <span class="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold mb-4">How It Works</span>
+            <h2 class="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900">Start Learning in <span class="text-blue-600">3 Simple Steps</span></h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 relative">
+            <!-- Connecting line -->
+            <div class="hidden md:block absolute top-12 left-[16.67%] right-[16.67%] h-0.5 bg-blue-200"></div>
+
+            <!-- Step 1 -->
+            <div class="relative text-center group">
+                <div class="w-16 h-16 sm:w-24 sm:h-24 bg-blue-600 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform duration-300 relative z-10">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Sign Up Free</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Create your account in 30 seconds. Choose your word category and preferred delivery time.</p>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="relative text-center group">
+                <div class="w-16 h-16 sm:w-24 sm:h-24 bg-green-600 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg shadow-green-200 group-hover:scale-110 transition-transform duration-300 relative z-10">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Get Words on WhatsApp</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Start your 7-day free trial. Receive your first 10 words on WhatsApp the next morning.</p>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="relative text-center group">
+                <div class="w-16 h-16 sm:w-24 sm:h-24 bg-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg shadow-purple-200 group-hover:scale-110 transition-transform duration-300 relative z-10">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Learn & Grow</h3>
+                    <p class="text-gray-500 text-sm leading-relaxed">Build your vocabulary daily. Track streaks, earn achievements, and watch your English improve.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Section -->
+<section id="pricing" class="py-16 sm:py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-10 sm:mb-16">
+            <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Simple, Affordable Pricing</h2>
+            <p class="mt-3 sm:mt-4 text-lg sm:text-xl text-gray-600">Start free, upgrade when ready</p>
+        </div>
+
+        <div class="max-w-md mx-auto">
+            <div class="bg-white border-2 border-blue-200 rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg relative">
+                <div class="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <span class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold">Most Popular</span>
+                </div>
+                <div class="text-center pt-4">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Pro Plan</h3>
+                    <div class="flex items-baseline justify-center mb-4">
+                        <span class="text-5xl font-bold text-blue-600">15</span>
+                        <span class="text-xl text-gray-600 ml-2">Taka/month</span>
+                    </div>
+                    <ul class="text-left space-y-3 mb-8">
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            10 words daily via WhatsApp
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            Bengali meanings & phonetics
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            3 word categories to choose from
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            Personalized delivery time
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            7-day free trial
+                        </li>
+                    </ul>
+                    <a href="/signup" class="block w-full bg-blue-600 text-white py-4 rounded-full font-semibold text-lg hover:bg-blue-700 transition">
+                        Start Free Trial
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-14 sm:py-20 bg-gradient-to-r from-blue-600 to-blue-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4">Ready to Start Learning?</h2>
+        <p class="text-lg sm:text-xl text-blue-100 mb-6 sm:mb-8">Join 500+ students improving their English vocabulary</p>
+        <a href="/signup" class="inline-block bg-white text-blue-600 px-8 sm:px-10 py-3 sm:py-4 rounded-full font-semibold text-base sm:text-lg hover:bg-gray-100 transition transform hover:scale-105">
+            Sign Up Free Now
+        </a>
+    </div>
+</section>
+{% endblock %}

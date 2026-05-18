@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}AI Tutor - VocabPro{% endblock %}
+
+{% block extra_head %}
+<style>
+    .chat-bubble-user {
+        animation: fadeInRight 0.3s ease-out;
+    }
+    .chat-bubble-bot {
+        animation: fadeInLeft 0.3s ease-out;
+    }
+    @keyframes fadeInRight {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fadeInLeft {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    .typing-dots span {
+        animation: typing 1.4s infinite;
+        display: inline-block;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-8px); }
+    }
+    #chatMessages::-webkit-scrollbar { width: 6px; }
+    #chatMessages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-[calc(100vh-64px)]">
+    <!-- Chat Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 shadow-md">
+        <div class="max-w-3xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span id="personaIcon" class="text-2xl">👨‍🏫</span>
+                <div>
+                    <h1 id="personaName" class="font-bold text-lg">English Tutor</h1>
+                    <p id="personaDesc" class="text-blue-100 text-xs">Patient, encouraging personal language coach</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <select id="personaSelect" onchange="switchPersona(this.value)"
+                    class="bg-white/20 text-white border border-white/30 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-white/50 cursor-pointer">
+                    <option value="chat" class="text-gray-900">🤖 C_ium Chat</option>
+                    <option value="mentor" class="text-gray-900">🎓 Mentor Mode</option>
+                    <option value="tutor" class="text-gray-900">👨‍🏫 English Tutor</option>
+                    <option value="ielts_examiner" class="text-gray-900">📝 IELTS Examiner</option>
+                    <option value="conversation_partner" class="text-gray-900">💬 Conversation</option>
+                    <option value="grammar_teacher" class="text-gray-900">📖 Grammar</option>
+                </select>
+                <button onclick="clearChat()" class="bg-white/20 hover:bg-white/30 border border-white/30 rounded-lg px-3 py-1.5 text-sm transition" title="New Chat">
+                    <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div id="chatMessages" class="flex-1 overflow-y-auto bg-gray-50 px-4 py-6">
+        <div class="max-w-3xl mx-auto space-y-4" id="messagesContainer">
+            <!-- Suggested Prompts (shown when empty) -->
+            <div id="suggestedPrompts" class="text-center py-12">
+                <div class="text-5xl mb-4">🤖</div>
+                <h2 class="text-xl font-bold text-gray-800 mb-2">VocabPro AI Tutor</h2>
+                <p class="text-gray-500 mb-8">Ask me anything about English! I can help with vocabulary, grammar, translations, and more.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+                    <button onclick="usePrompt(this)" class="text-left p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition text-sm text-gray-700">
+                        "Translate 'resilient' to Bengali"
+                    </button>
+                    <button onclick="usePrompt(this)" class="text-left p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition text-sm text-gray-700">
+                        "Explain the difference between 'affect' and 'effect'"
+                    </button>
+                    <button onclick="usePrompt(this)" class="text-left p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition text-sm text-gray-700">
+                        "Correct this: 'He go to school yesterday'"
+                    </button>
+                    <button onclick="usePrompt(this)" class="text-left p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition text-sm text-gray-700">
+                        "Help me prepare for IELTS Writing Task 2"
+                    </button>
+                </div>
+            </div>
+
+            <!-- Typing Indicator (hidden by default) -->
+            <div id="typingIndicator" class="hidden">
+                <div class="flex items-start gap-3 max-w-[80%]">
+                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm flex-shrink-0">🤖</div>
+                    <div class="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-100">
+                        <div class="typing-dots text-gray-400">
+                            <span class="text-lg">.</span><span class="text-lg">.</span><span class="text-lg">.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
+        <div class="max-w-3xl mx-auto">
+            <div class="flex items-end gap-2">
+                <textarea id="chatInput" rows="1" placeholder="Ask me anything about English..."
+                    class="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400 max-h-32"
+                    onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+                <button id="sendBtn" onclick="sendMessage()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-3 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1 text-center">Press Enter to send, Shift+Enter for new line</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPersona = 'chat';
+let isWaiting = false;
+
+const PERSONAS = {
+    "chat": {"name": "C_ium Chat", "icon": "🤖", "description": "Friendly AI companion for casual conversation"},
+    "mentor": {"name": "Mentor Mode", "icon": "🎓", "description": "Personal English mentor and exam coach"},
+    "tutor": {"name": "English Tutor", "icon": "👨‍🏫", "description": "Patient, encouraging personal language coach"},
+    "ielts_examiner": {"name": "IELTS Examiner", "icon": "📝", "description": "Practice IELTS speaking and writing"},
+    "conversation_partner": {"name": "Conversation", "icon": "💬", "description": "Casual English conversation practice"},
+    "grammar_teacher": {"name": "Grammar", "icon": "📖", "description": "Grammar explanations and exercises"}
+};
+
+// Load history on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadHistory();
+});
+
+async function loadHistory() {
+    try {
+        const response = await fetch(`/api/chatbot/history?persona=${currentPersona}`);
+        const data = await response.json();
+
+        if (data.status === 'success' && data.messages.length > 0) {
+            document.getElementById('suggestedPrompts').classList.add('hidden');
+            data.messages.forEach(msg => appendMessage(msg.role, msg.content, false));
+            scrollToBottom();
+        } else {
+            document.getElementById('suggestedPrompts').classList.remove('hidden');
+        }
+    } catch (e) {
+        console.error('Failed to load history:', e);
+    }
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message || isWaiting) return;
+
+    // Hide suggested prompts
+    document.getElementById('suggestedPrompts').classList.add('hidden');
+
+    // Show user message immediately
+    appendMessage('user', message, true);
+    input.value = '';
+    autoResize(input);
+
+    // Disable input
+    isWaiting = true;
+    document.getElementById('sendBtn').disabled = true;
+    input.disabled = true;
+
+    // Show typing indicator
+    showTyping();
+    scrollToBottom();
+
+    try {
+        const response = await fetch('/api/chatbot/send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: message, persona: currentPersona})
+        });
+        const data = await response.json();
+
+        hideTyping();
+
+        if (data.status === 'success') {
+            appendMessage('assistant', data.response, true);
+        } else {
+            appendMessage('assistant', 'Sorry, I encountered an error. Please try again.', true);
+        }
+    } catch (e) {
+        hideTyping();
+        appendMessage('assistant', 'Network error. Please check your connection and try again.', true);
+    }
+
+    // Re-enable input
+    isWaiting = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.disabled = false;
+    input.focus();
+    scrollToBottom();
+}
+
+function appendMessage(role, content, animate) {
+    const container = document.getElementById('messagesContainer');
+    const typingEl = document.getElementById('typingIndicator');
+
+    const div = document.createElement('div');
+
+    if (role === 'user') {
+        div.className = `flex justify-end ${animate ? 'chat-bubble-user' : ''}`;
+        div.innerHTML = `
+            <div class="max-w-[80%]">
+                <div class="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+                    <p class="text-sm whitespace-pre-wrap">${escapeHtml(content)}</p>
+                </div>
+            </div>
+        `;
+    } else {
+        div.className = `flex items-start gap-3 ${animate ? 'chat-bubble-bot' : ''}`;
+        div.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm flex-shrink-0">🤖</div>
+            <div class="max-w-[80%]">
+                <div class="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-100">
+                    <p class="text-sm text-gray-800 whitespace-pre-wrap">${formatMessage(content)}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    container.insertBefore(div, typingEl);
+}
+
+function formatMessage(text) {
+    // Simple formatting: bold, code, line breaks
+    let escaped = escapeHtml(text);
+    escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    escaped = escaped.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>');
+    return escaped;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showTyping() {
+    document.getElementById('typingIndicator').classList.remove('hidden');
+}
+
+function hideTyping() {
+    document.getElementById('typingIndicator').classList.add('hidden');
+}
+
+function scrollToBottom() {
+    const chat = document.getElementById('chatMessages');
+    setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 50);
+}
+
+function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 128) + 'px';
+}
+
+function usePrompt(btn) {
+    const text = btn.textContent.replace(/^"|"$/g, '');
+    document.getElementById('chatInput').value = text;
+    sendMessage();
+}
+
+async function switchPersona(persona) {
+    currentPersona = persona;
+    const p = PERSONAS[persona];
+    if (p) {
+        document.getElementById('personaIcon').textContent = p.icon;
+        document.getElementById('personaName').textContent = p.name;
+        document.getElementById('personaDesc').textContent = p.description;
+    }
+
+    // Clear UI and reload history
+    const container = document.getElementById('messagesContainer');
+    const typingEl = document.getElementById('typingIndicator');
+    const prompts = document.getElementById('suggestedPrompts');
+
+    // Remove all message divs (keep typing indicator and prompts)
+    const messages = container.querySelectorAll('.chat-bubble-user, .chat-bubble-bot, .flex.justify-end, .flex.items-start.gap-3:not(#typingIndicator)');
+    messages.forEach(el => el.remove());
+
+    // Also remove any non-special children
+    Array.from(container.children).forEach(el => {
+        if (el.id !== 'suggestedPrompts' && el.id !== 'typingIndicator') {
+            el.remove();
+        }
+    });
+
+    await loadHistory();
+}
+
+async function clearChat() {
+    if (!confirm('Start a new chat? This will clear your conversation history.')) return;
+
+    try {
+        await fetch('/api/chatbot/clear', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({persona: currentPersona})
+        });
+
+        // Clear UI
+        const container = document.getElementById('messagesContainer');
+        Array.from(container.children).forEach(el => {
+            if (el.id !== 'suggestedPrompts' && el.id !== 'typingIndicator') {
+                el.remove();
+            }
+        });
+
+        document.getElementById('suggestedPrompts').classList.remove('hidden');
+    } catch (e) {
+        console.error('Failed to clear chat:', e);
+    }
+}
+</script>
+{% endblock %}

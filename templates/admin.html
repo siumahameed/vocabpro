@@ -1,0 +1,1485 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - VocabPro{% endblock %}
+
+{% block extra_head %}
+<style>
+    .nav-tab {
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+    @media (min-width: 640px) {
+        .nav-tab {
+            padding: 0.75rem 1.5rem;
+        }
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .nav-tab.active {
+        border-bottom-color: #2196F3;
+        color: #2196F3;
+    }
+    .nav-tab:hover:not(.active) {
+        color: #666;
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .data-table th {
+        background: #f9fafb;
+        padding: 8px 10px;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 2px solid #e5e7eb;
+        font-size: 13px;
+    }
+    .data-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 13px;
+    }
+    @media (min-width: 640px) {
+        .data-table th, .data-table td {
+            padding: 12px;
+            font-size: 14px;
+        }
+    }
+    .data-table tr:hover {
+        background: #f9fafb;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-approved { background: #d1fae5; color: #065f46; }
+    .status-rejected { background: #fee2e2; color: #991b1b; }
+    .status-paid { background: #d1fae5; color: #065f46; }
+    .status-trial { background: #fef3c7; color: #92400e; }
+    .status-expired { background: #fee2e2; color: #991b1b; }
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    .chart-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+    .chart-bar-fill {
+        height: 24px;
+        background: linear-gradient(90deg, #3b82f6, #10b981);
+        border-radius: 4px;
+        min-width: 20px;
+        transition: width 0.3s;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Admin Header -->
+    <div class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center space-x-2 sm:space-x-4 min-w-0">
+                    <span class="text-xl sm:text-2xl font-bold flex-shrink-0">
+                        <span class="text-blue-600">Vocab</span><span class="text-green-500">Pro</span>
+                    </span>
+                    <span class="bg-purple-100 text-purple-700 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium">Admin</span>
+                </div>
+                <div class="flex items-center space-x-3 sm:space-x-4 flex-shrink-0">
+                    <a href="/dashboard" class="text-gray-600 hover:text-gray-900 text-sm">Dashboard</a>
+                    <a href="/admin-logout" class="text-red-600 hover:text-red-700 text-sm">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-6 sm:mb-8">
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4">
+                <p class="text-xs sm:text-sm text-gray-500">Total Users</p>
+                <p class="text-xl sm:text-2xl font-bold text-blue-600">{{ stats.total_users }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4">
+                <p class="text-xs sm:text-sm text-gray-500">Active</p>
+                <p class="text-xl sm:text-2xl font-bold text-green-600">{{ stats.active_subscribers }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4">
+                <p class="text-xs sm:text-sm text-gray-500">Trial</p>
+                <p class="text-xl sm:text-2xl font-bold text-yellow-600">{{ stats.trial_users }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4">
+                <p class="text-xs sm:text-sm text-gray-500">Pending</p>
+                <p class="text-xl sm:text-2xl font-bold text-orange-600">{{ stats.pending_payments }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4">
+                <p class="text-xs sm:text-sm text-gray-500">This Month</p>
+                <p class="text-xl sm:text-2xl font-bold text-purple-600">{{ stats.monthly_revenue }} TK</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4">
+                <p class="text-xs sm:text-sm text-gray-500">Total Revenue</p>
+                <p class="text-xl sm:text-2xl font-bold text-indigo-600">{{ stats.total_revenue }} TK</p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-lg shadow mb-4 sm:mb-6">
+            <div class="flex border-b overflow-x-auto scrollbar-hide">
+                <div class="nav-tab active whitespace-nowrap text-sm sm:text-base" onclick="showTab('users', this)">Users</div>
+                <div class="nav-tab whitespace-nowrap text-sm sm:text-base" onclick="showTab('payments', this)">Payments</div>
+                <div class="nav-tab whitespace-nowrap text-sm sm:text-base" onclick="showTab('broadcast', this)">Broadcast</div>
+                <div class="nav-tab whitespace-nowrap text-sm sm:text-base" onclick="showTab('vocabulary', this)">Vocabulary</div>
+                <div class="nav-tab whitespace-nowrap text-sm sm:text-base" onclick="showTab('requests', this)">Requests</div>
+                <div class="nav-tab whitespace-nowrap text-sm sm:text-base" onclick="showTab('analytics', this)">Analytics</div>
+            </div>
+        </div>
+
+        <!-- ==================== USERS TAB ==================== -->
+        <div id="tab-users" class="tab-content">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <h3 class="font-semibold text-gray-900">User Management</h3>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="text" id="userSearch" placeholder="Search name, email, phone..."
+                                class="px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                                onkeyup="searchUsers()">
+                            <select id="userStatusFilter" class="px-4 py-2 border rounded-lg text-sm"
+                                onchange="searchUsers()">
+                                <option value="all">All Status</option>
+                                <option value="paid">Paid</option>
+                                <option value="trial">Trial</option>
+                                <option value="expired">Expired</option>
+                            </select>
+                            <button onclick="exportUsers()" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700">Export CSV</button>
+                        </div>
+                    </div>
+                    <!-- Bulk Actions -->
+                    <div class="mt-3 flex items-center gap-2" id="bulkActions" style="display:none;">
+                        <span class="text-sm text-gray-600"><span id="selectedCount">0</span> selected</span>
+                        <button onclick="bulkToggle('activate')" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">Activate</button>
+                        <button onclick="bulkToggle('deactivate')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Deactivate</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="hidden sm:table-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                <th class="hidden md:table-cell">ID</th>
+                                <th>Name</th>
+                                <th class="hidden md:table-cell">Email</th>
+                                <th class="hidden lg:table-cell">WhatsApp</th>
+                                <th>Status</th>
+                                <th class="hidden md:table-cell">Streak</th>
+                                <th class="hidden lg:table-cell">Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            {% for user in users %}
+                            <tr>
+                                <td class="hidden sm:table-cell"><input type="checkbox" class="user-checkbox" value="{{ user.id }}" onchange="updateBulkActions()"></td>
+                                <td class="hidden md:table-cell">{{ user.id }}</td>
+                                <td>{{ user.name }}</td>
+                                <td class="hidden md:table-cell">{{ user.email }}</td>
+                                <td class="hidden lg:table-cell">{{ user.whatsapp_number }}</td>
+                                <td>
+                                    <span class="status-badge {% if user.is_paid %}status-paid{% else %}status-trial{% endif %}">
+                                        {% if user.is_paid %}Paid{% else %}Trial{% endif %}
+                                    </span>
+                                </td>
+                                <td class="hidden md:table-cell">{{ user.streak_days or 0 }} days</td>
+                                <td class="hidden lg:table-cell">{{ user.created_at[:10] }}</td>
+                                <td class="flex gap-2">
+                                    <button onclick="viewUser({{ user.id }})" class="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                                    <button onclick="toggleSubscription({{ user.id }})" class="text-sm {% if user.is_paid %}text-red-600{% else %}text-green-600{% endif %}">
+                                        {% if user.is_paid %}Deactivate{% else %}Activate{% endif %}
+                                    </button>
+                                    <button onclick="deleteUser({{ user.id }}, '{{ user.name }}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== PAYMENTS TAB ==================== -->
+        <div id="tab-payments" class="tab-content hidden">
+            <!-- Revenue Summary -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-500">Today</p>
+                    <p class="text-xl font-bold text-green-600" id="revToday">0 TK</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-500">This Week</p>
+                    <p class="text-xl font-bold text-blue-600" id="revWeek">0 TK</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-500">This Month</p>
+                    <p class="text-xl font-bold text-purple-600" id="revMonth">0 TK</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-500">Total</p>
+                    <p class="text-xl font-bold text-indigo-600" id="revTotal">0 TK</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <h3 class="font-semibold text-gray-900">Payment History</h3>
+                        <select id="paymentFilter" class="px-4 py-2 border rounded-lg text-sm" onchange="loadPayments()">
+                            <option value="all">All Payments</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="hidden md:table-cell">ID</th>
+                                <th>User</th>
+                                <th class="hidden lg:table-cell">Email</th>
+                                <th>Amount</th>
+                                <th class="hidden md:table-cell">Transaction ID</th>
+                                <th>Status</th>
+                                <th class="hidden lg:table-cell">Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentsTableBody">
+                            {% for payment in payments %}
+                            <tr>
+                                <td class="hidden md:table-cell">{{ payment.id }}</td>
+                                <td>{{ payment.name }}</td>
+                                <td class="hidden lg:table-cell">{{ payment.email }}</td>
+                                <td>{{ payment.amount }} TK</td>
+                                <td class="font-mono text-sm hidden md:table-cell">{{ payment.transaction_id }}</td>
+                                <td>
+                                    <span class="status-badge status-{{ payment.status }}">{{ payment.status|capitalize }}</span>
+                                </td>
+                                <td class="hidden lg:table-cell">{{ payment.created_at[:16] }}</td>
+                                <td>
+                                    {% if payment.status == 'pending' %}
+                                    <div class="flex gap-2">
+                                        <button onclick="approvePayment({{ payment.id }})" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">Approve</button>
+                                        <button onclick="rejectPayment({{ payment.id }})" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Reject</button>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-gray-400 text-sm">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== BROADCAST TAB ==================== -->
+        <div id="tab-broadcast" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="font-semibold text-gray-900 mb-4">Send Message to All Users</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                        <textarea id="broadcastMessage" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter your message..."></textarea>
+                    </div>
+                    <button onclick="sendBroadcast()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
+                        Send to All
+                    </button>
+                </div>
+                <div id="broadcastResult" class="mt-4 hidden"></div>
+            </div>
+        </div>
+
+        <!-- ==================== VOCABULARY TAB ==================== -->
+        <div id="tab-vocabulary" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                    <h3 class="font-semibold text-gray-900">Vocabulary Management</h3>
+                    <div class="flex gap-2">
+                        <button onclick="showAddWordForm()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">+ Add Word</button>
+                        <button onclick="document.getElementById('importFile').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Import CSV</button>
+                        <input type="file" id="importFile" accept=".csv" style="display:none" onchange="importVocabulary(this)">
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="flex items-center gap-6 mb-6 p-4 bg-blue-50 rounded-lg">
+                    <div class="text-center">
+                        <p class="text-3xl font-bold text-blue-600" id="vocabCount">-</p>
+                        <p class="text-sm text-gray-600">Total Words</p>
+                    </div>
+                    <div id="vocabCategoryStats" class="text-sm text-gray-600"></div>
+                </div>
+
+                <!-- Search and Filter -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                    <input type="text" id="vocabSearch" placeholder="Search word or meaning..."
+                        class="px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 flex-1"
+                        onkeyup="searchVocabulary()">
+                    <select id="vocabCategoryFilter" class="px-4 py-2 border rounded-lg text-sm" onchange="searchVocabulary()">
+                        <option value="all">All Categories</option>
+                        <option value="ielts">IELTS</option>
+                        <option value="gre">GRE</option>
+                        <option value="common">Common</option>
+                    </select>
+                </div>
+
+                <!-- Category Stats -->
+                <div class="mb-6 p-5 bg-white border border-gray-200 rounded-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="font-semibold text-gray-800">Words by Category</h4>
+                        <span id="totalWordCount" class="text-sm text-gray-500"></span>
+                    </div>
+                    <div id="categoryStatsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div class="flex justify-end">
+                        <button onclick="clearAllVocabulary()" class="text-sm text-red-600 hover:text-red-800 hover:underline">Clear All Words</button>
+                    </div>
+                    <div id="clearResult" class="mt-2 hidden text-sm"></div>
+                </div>
+
+                <!-- Generate with AI -->
+                <div class="mb-6 p-5 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl">
+                    <h4 class="font-semibold text-gray-800 mb-2">Generate Words with AI</h4>
+                    <p class="text-sm text-gray-500 mb-4">Select a category and generate vocabulary words</p>
+                    <div class="flex items-center gap-3 mb-4">
+                        <select id="wordCount" class="px-4 py-2 border rounded-lg text-sm bg-white">
+                            <option value="10">10 words</option>
+                            <option value="25">25 words</option>
+                            <option value="50" selected>50 words</option>
+                            <option value="100">100 words</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="generateForCategory('ielts')" class="gen-cat-btn bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                            IELTS
+                        </button>
+                        <button onclick="generateForCategory('gre')" class="gen-cat-btn bg-purple-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-purple-700 transition">
+                            GRE
+                        </button>
+                        <button onclick="generateForCategory('common')" class="gen-cat-btn bg-green-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+                            Common
+                        </button>
+                    </div>
+                    <div id="generateResult" class="mt-3 hidden"></div>
+                </div>
+
+                <!-- Import Word List with AI -->
+                <div class="mb-6 p-5 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl">
+                    <h4 class="font-semibold text-gray-800 mb-2">Import Word List</h4>
+                    <p class="text-sm text-gray-500 mb-4">Upload a TXT, CSV, or Excel file with words. AI will auto-generate Bengali meanings, phonetics, and examples.</p>
+                    <div class="flex flex-col sm:flex-row gap-3 items-start">
+                        <select id="importCategory" class="px-4 py-2 border rounded-lg text-sm bg-white">
+                            <option value="ielts">IELTS</option>
+                            <option value="gre">GRE</option>
+                            <option value="common">Common</option>
+                        </select>
+                        <label class="cursor-pointer bg-white border border-gray-300 px-5 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                            Choose file
+                            <input type="file" accept=".txt,.csv,.text,.xlsx,.xls" onchange="importWordsWithAI(this)" class="hidden">
+                        </label>
+                    </div>
+                    <div id="importResult" class="mt-3 hidden"></div>
+                </div>
+
+                <!-- Words Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left hidden md:table-cell">#</th>
+                                <th class="px-3 py-2 text-left">Word</th>
+                                <th class="px-3 py-2 text-left hidden lg:table-cell">Phonetic</th>
+                                <th class="px-3 py-2 text-left">Bengali Meaning</th>
+                                <th class="px-3 py-2 text-left">Category</th>
+                                <th class="px-3 py-2 text-left hidden md:table-cell">Example</th>
+                                <th class="px-3 py-2 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vocabTableBody" class="divide-y">
+                            {% for w in vocabulary %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-3 py-2 text-gray-500 hidden md:table-cell">{{ w.id }}</td>
+                                <td class="px-3 py-2 font-medium">{{ w.word }}</td>
+                                <td class="px-3 py-2 text-gray-500 hidden lg:table-cell">{{ w.phonetic or '-' }}</td>
+                                <td class="px-3 py-2">{{ w.meaning_bn }}</td>
+                                <td class="px-3 py-2">
+                                    {% if w.category %}
+                                    {% for cat in w.category.split(',') %}
+                                    <span class="status-badge inline-block mb-1 {% if cat.strip()|lower == 'ielts' %}status-approved{% elif cat.strip()|lower == 'gre' %}status-pending{% elif cat.strip()|lower == 'common' %}bg-green-100 text-green-800{% else %}status-trial{% endif %}">
+                                        {{ cat.strip() }}
+                                    </span>
+                                    {% endfor %}
+                                    {% else %}
+                                    <span class="status-badge inline-block mb-1 status-trial">uncategorized</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-2 text-gray-600 max-w-xs truncate hidden md:table-cell">{{ w.example or '-' }}</td>
+                                <td class="px-3 py-2">
+                                    <div class="flex gap-2">
+                                        <button onclick='editWord({{ w|tojson }})' class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
+                                        <button onclick="deleteWord({{ w.id }}, '{{ w.word }}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== REQUESTS TAB ==================== -->
+        <div id="tab-requests" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-semibold text-gray-900">Category Change Requests</h3>
+                        <button onclick="loadCategoryRequests()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Refresh</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">ID</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">User</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Email</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Requested Category</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requestsTableBody">
+                            <tr><td colspan="6" class="p-8 text-center text-gray-500">Click Refresh to load requests</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ANALYTICS TAB ==================== -->
+        <div id="tab-analytics" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- User Growth Chart -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">User Growth (Last 30 Days)</h3>
+                    <div id="growthChart" class="space-y-1"></div>
+                </div>
+
+                <!-- Activity Stats -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">User Activity</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Active Today</span>
+                                <span id="activeToday" class="font-bold">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                <div id="activeTodayBar" class="bg-green-500 h-4 rounded-full" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Active This Week</span>
+                                <span id="activeWeek" class="font-bold">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                <div id="activeWeekBar" class="bg-blue-500 h-4 rounded-full" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Active This Month</span>
+                                <span id="activeMonth" class="font-bold">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                <div id="activeMonthBar" class="bg-purple-500 h-4 rounded-full" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Inactive (30+ days)</span>
+                                <span id="inactiveUsers" class="font-bold">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                <div id="inactiveBar" class="bg-red-500 h-4 rounded-full" style="width:0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delivery Stats -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">Message Delivery</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                            <p class="text-3xl font-bold text-blue-600" id="totalWordsSent">0</p>
+                            <p class="text-sm text-gray-600">Total Words Sent</p>
+                        </div>
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <p class="text-3xl font-bold text-green-600" id="usersToday">0</p>
+                            <p class="text-sm text-gray-600">Users Active Today</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Users -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">Top Users by Streak</h3>
+                    <div id="topUsersList" class="space-y-2"></div>
+                </div>
+
+                <!-- Vocabulary Categories -->
+                <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+                    <h3 class="font-semibold text-gray-900 mb-4">Vocabulary by Category</h3>
+                    <div id="vocabCategoryChart" class="flex items-end gap-4 h-40"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- User Detail Modal -->
+<div id="userModal" class="modal-overlay hidden" onclick="if(event.target===this)closeUserModal()">
+    <div class="modal-content">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">User Details</h3>
+            <button onclick="closeUserModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+        </div>
+        <div id="userModalContent"></div>
+    </div>
+</div>
+
+<!-- Word Edit Modal -->
+<div id="wordModal" class="modal-overlay hidden" onclick="if(event.target===this)closeWordModal()">
+    <div class="modal-content">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold" id="wordModalTitle">Edit Word</h3>
+            <button onclick="closeWordModal()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+        </div>
+        <form id="wordForm" onsubmit="saveWord(event)">
+            <input type="hidden" id="wordId">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Word *</label>
+                    <input type="text" id="wordText" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phonetic</label>
+                    <input type="text" id="wordPhonetic" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="/wkab/">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bengali Meaning *</label>
+                    <input type="text" id="wordMeaning" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="বাংলা অর্থ">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categories</label>
+                    <div class="grid grid-cols-3 gap-2" id="wordCategoryCheckboxes">
+                        <label class="flex items-center space-x-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" name="word_cat" value="ielts" class="rounded">
+                            <span class="text-sm">IELTS</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" name="word_cat" value="gre" class="rounded">
+                            <span class="text-sm">GRE</span>
+                        </label>
+                        <label class="flex items-center space-x-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" name="word_cat" value="common" class="rounded">
+                            <span class="text-sm">Common</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Example Sentence</label>
+                    <textarea id="wordExample" rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Save Word</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ==================== TAB NAVIGATION ====================
+function showTab(tabName, el) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.remove('hidden');
+    if (el) el.classList.add('active');
+
+    if (tabName === 'payments') loadPayments();
+    if (tabName === 'analytics') loadAnalytics();
+    if (tabName === 'vocabulary') loadVocabularyCount();
+    if (tabName === 'requests') loadCategoryRequests();
+}
+
+// ==================== USER MANAGEMENT ====================
+let selectedUsers = new Set();
+
+async function searchUsers() {
+    const search = document.getElementById('userSearch').value;
+    const status = document.getElementById('userStatusFilter').value;
+
+    try {
+        const response = await fetch(`/api/admin/users?search=${encodeURIComponent(search)}&status=${status}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            renderUsersTable(data.users);
+        }
+    } catch (e) {
+        console.error('Error searching users:', e);
+    }
+}
+
+function renderUsersTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    tbody.innerHTML = users.map(u => `
+        <tr>
+            <td><input type="checkbox" class="user-checkbox" value="${u.id}" onchange="updateBulkActions()"></td>
+            <td>${u.id}</td>
+            <td>${u.name}</td>
+            <td>${u.email}</td>
+            <td>${u.whatsapp_number || ''}</td>
+            <td><span class="status-badge ${u.is_paid ? 'status-paid' : 'status-trial'}">${u.is_paid ? 'Paid' : 'Trial'}</span></td>
+            <td>${u.streak_days || 0} days</td>
+            <td>${(u.created_at || '').slice(0, 10)}</td>
+            <td class="flex gap-2">
+                <button onclick="viewUser(${u.id})" class="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                <button onclick="toggleSubscription(${u.id})" class="text-sm ${u.is_paid ? 'text-red-600' : 'text-green-600'}">${u.is_paid ? 'Deactivate' : 'Activate'}</button>
+                <button onclick="deleteUser(${u.id}, '${u.name}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.user-checkbox').forEach(cb => {
+        cb.checked = checked;
+    });
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checked = document.querySelectorAll('.user-checkbox:checked');
+    selectedUsers = new Set(Array.from(checked).map(cb => parseInt(cb.value)));
+    document.getElementById('selectedCount').textContent = selectedUsers.size;
+    document.getElementById('bulkActions').style.display = selectedUsers.size > 0 ? 'flex' : 'none';
+}
+
+async function bulkToggle(action) {
+    if (selectedUsers.size === 0) return;
+    if (!confirm(`${action} ${selectedUsers.size} users?`)) return;
+
+    try {
+        const response = await fetch('/api/admin/bulk-toggle', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_ids: Array.from(selectedUsers), action })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error processing request');
+    }
+}
+
+async function viewUser(userId) {
+    try {
+        const response = await fetch(`/api/admin/user/${userId}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            const u = data.user;
+            const paymentsHtml = (u.payments || []).map(p => `
+                <tr>
+                    <td class="px-2 py-1">${p.amount} TK</td>
+                    <td class="px-2 py-1 font-mono text-xs">${p.transaction_id}</td>
+                    <td class="px-2 py-1"><span class="status-badge status-${p.status}">${p.status}</span></td>
+                    <td class="px-2 py-1 text-xs">${(p.created_at || '').slice(0, 16)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('userModalContent').innerHTML = `
+                <div class="space-y-3 text-sm">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><strong>Name:</strong> ${u.name}</div>
+                        <div><strong>Email:</strong> ${u.email}</div>
+                        <div><strong>Phone:</strong> ${u.phone}</div>
+                        <div><strong>WhatsApp:</strong> ${u.whatsapp_number || '-'}</div>
+                        <div><strong>Status:</strong> <span class="status-badge ${u.is_paid ? 'status-paid' : 'status-trial'}">${u.is_paid ? 'Paid' : 'Trial'}</span></div>
+                        <div><strong>Trial Ends:</strong> ${u.trial_ends || '-'}</div>
+                        <div><strong>Streak:</strong> ${u.streak_days || 0} days</div>
+                        <div><strong>Words Learned:</strong> ${u.words_learned || 0}</div>
+                        <div><strong>Referral Code:</strong> ${u.referral_code || '-'}</div>
+                        <div><strong>Referrals:</strong> ${u.referral_count || 0}</div>
+                        <div><strong>Joined:</strong> ${(u.created_at || '').slice(0, 10)}</div>
+                        <div><strong>Last Active:</strong> ${u.last_active_date || '-'}</div>
+                    </div>
+                    ${paymentsHtml ? `
+                    <div class="mt-4">
+                        <h4 class="font-semibold mb-2">Payment History</h4>
+                        <table class="w-full text-xs">
+                            <thead><tr class="bg-gray-50"><th class="px-2 py-1 text-left">Amount</th><th class="px-2 py-1 text-left">Txn ID</th><th class="px-2 py-1 text-left">Status</th><th class="px-2 py-1 text-left">Date</th></tr></thead>
+                            <tbody>${paymentsHtml}</tbody>
+                        </table>
+                    </div>
+                    ` : '<p class="text-gray-500 mt-2">No payments yet</p>'}
+                </div>
+            `;
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+    } catch (e) {
+        alert('Error loading user details');
+    }
+}
+
+function closeUserModal() {
+    document.getElementById('userModal').classList.add('hidden');
+}
+
+async function toggleSubscription(userId) {
+    if (!confirm('Toggle user subscription?')) return;
+    try {
+        const response = await fetch('/api/admin/toggle-subscription', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error processing request');
+    }
+}
+
+async function deleteUser(userId, name) {
+    if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+    try {
+        const response = await fetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert('User deleted');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error processing request');
+    }
+}
+
+function exportUsers() {
+    window.open('/api/admin/export-users', '_blank');
+}
+
+// ==================== PAYMENT MANAGEMENT ====================
+async function loadPayments() {
+    const status = document.getElementById('paymentFilter').value;
+    try {
+        const response = await fetch(`/api/admin/payments?status=${status}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            renderPaymentsTable(data.payments);
+            if (data.revenue) {
+                document.getElementById('revToday').textContent = data.revenue.today + ' TK';
+                document.getElementById('revWeek').textContent = data.revenue.week + ' TK';
+                document.getElementById('revMonth').textContent = data.revenue.month + ' TK';
+                document.getElementById('revTotal').textContent = data.revenue.total + ' TK';
+            }
+        }
+    } catch (e) {
+        console.error('Error loading payments:', e);
+    }
+}
+
+function renderPaymentsTable(payments) {
+    const tbody = document.getElementById('paymentsTableBody');
+    tbody.innerHTML = payments.map(p => `
+        <tr>
+            <td>${p.id}</td>
+            <td>${p.name}</td>
+            <td>${p.email}</td>
+            <td>${p.amount} TK</td>
+            <td class="font-mono text-sm">${p.transaction_id}</td>
+            <td><span class="status-badge status-${p.status}">${p.status.charAt(0).toUpperCase() + p.status.slice(1)}</span></td>
+            <td>${(p.created_at || '').slice(0, 16)}</td>
+            <td>
+                ${p.status === 'pending' ? `
+                    <div class="flex gap-2">
+                        <button onclick="approvePayment(${p.id})" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">Approve</button>
+                        <button onclick="rejectPayment(${p.id})" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Reject</button>
+                    </div>
+                ` : '<span class="text-gray-400 text-sm">-</span>'}
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function approvePayment(paymentId) {
+    if (!confirm('Approve this payment?')) return;
+    try {
+        const response = await fetch('/api/admin/approve-payment', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ payment_id: paymentId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert('Payment approved!');
+            loadPayments();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error processing request');
+    }
+}
+
+async function rejectPayment(paymentId) {
+    if (!confirm('Reject this payment?')) return;
+    try {
+        const response = await fetch('/api/admin/reject-payment', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ payment_id: paymentId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert('Payment rejected.');
+            loadPayments();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error processing request');
+    }
+}
+
+// ==================== BROADCAST ====================
+async function sendBroadcast() {
+    const message = document.getElementById('broadcastMessage').value;
+    if (!message) { alert('Please enter a message'); return; }
+    if (!confirm('Send this message to all users?')) return;
+
+    try {
+        const response = await fetch('/api/admin/broadcast', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        const result = document.getElementById('broadcastResult');
+        result.classList.remove('hidden');
+        if (data.status === 'success') {
+            result.className = 'mt-4 p-4 rounded-lg bg-green-100 text-green-700';
+            result.innerHTML = `Message sent to ${data.sent} users`;
+        } else {
+            result.className = 'mt-4 p-4 rounded-lg bg-red-100 text-red-700';
+            result.innerHTML = `Error: ${data.message}`;
+        }
+    } catch (e) {
+        alert('Error sending broadcast');
+    }
+}
+
+// ==================== VOCABULARY MANAGEMENT ====================
+async function loadVocabularyCount() {
+    try {
+        const response = await fetch('/api/admin/vocabulary-count');
+        const data = await response.json();
+        if (data.status === 'success') {
+            document.getElementById('vocabCount').textContent = data.count;
+        }
+    } catch (e) {
+        console.error('Error loading vocabulary count');
+    }
+}
+
+async function searchVocabulary() {
+    const search = document.getElementById('vocabSearch').value;
+    const category = document.getElementById('vocabCategoryFilter').value;
+
+    try {
+        const response = await fetch(`/api/admin/vocabulary?search=${encodeURIComponent(search)}&category=${category}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            renderVocabTable(data.vocabulary);
+        }
+    } catch (e) {
+        console.error('Error searching vocabulary:', e);
+    }
+}
+
+function renderVocabTable(words) {
+    const tbody = document.getElementById('vocabTableBody');
+    tbody.innerHTML = words.map(w => `
+        <tr class="hover:bg-gray-50">
+            <td class="px-3 py-2 text-gray-500">${w.id}</td>
+            <td class="px-3 py-2 font-medium">${w.word}</td>
+            <td class="px-3 py-2 text-gray-500">${w.phonetic || '-'}</td>
+            <td class="px-3 py-2">${w.meaning_bn}</td>
+            <td class="px-3 py-2">${w.category ? w.category.split(',').map(c => {
+                c = c.trim().toLowerCase();
+                let cls = 'status-trial';
+                if (c === 'ielts') cls = 'status-approved';
+                else if (c === 'gre') cls = 'status-pending';
+                else if (c === 'common') cls = 'bg-green-100 text-green-800';
+                return '<span class="status-badge inline-block mb-1 ' + cls + '">' + c + '</span>';
+            }).join(' ') : '<span class="status-badge inline-block mb-1 status-trial">uncategorized</span>'}</td>
+            <td class="px-3 py-2 text-gray-600 max-w-xs truncate">${w.example || '-'}</td>
+            <td class="px-3 py-2">
+                <div class="flex gap-2">
+                    <button onclick='editWord(${JSON.stringify(w).replace(/'/g, "&#39;")})' class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
+                    <button onclick="deleteWord(${w.id}, '${w.word}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showAddWordForm() {
+    document.getElementById('wordModalTitle').textContent = 'Add New Word';
+    document.getElementById('wordId').value = '';
+    document.getElementById('wordText').value = '';
+    document.getElementById('wordPhonetic').value = '';
+    document.getElementById('wordMeaning').value = '';
+    document.querySelectorAll('input[name="word_cat"]').forEach(cb => cb.checked = false);
+    document.getElementById('wordExample').value = '';
+    document.getElementById('wordModal').classList.remove('hidden');
+}
+
+function editWord(word) {
+    document.getElementById('wordModalTitle').textContent = 'Edit Word';
+    document.getElementById('wordId').value = word.id;
+    document.getElementById('wordText').value = word.word;
+    document.getElementById('wordPhonetic').value = word.phonetic || '';
+    document.getElementById('wordMeaning').value = word.meaning_bn;
+    // Parse multi-category
+    const cats = (word.category || '').toLowerCase().split(',').map(c => c.trim()).filter(c => c);
+    document.querySelectorAll('input[name="word_cat"]').forEach(cb => {
+        cb.checked = cats.includes(cb.value);
+    });
+    document.getElementById('wordExample').value = word.example || '';
+    document.getElementById('wordModal').classList.remove('hidden');
+}
+
+function closeWordModal() {
+    document.getElementById('wordModal').classList.add('hidden');
+}
+
+async function saveWord(e) {
+    e.preventDefault();
+    const wordId = document.getElementById('wordId').value;
+    const selectedCats = Array.from(document.querySelectorAll('input[name="word_cat"]:checked'))
+        .map(cb => cb.value);
+    const category = selectedCats.length > 0 ? selectedCats.join(',') : '';
+    const payload = {
+        word: document.getElementById('wordText').value,
+        phonetic: document.getElementById('wordPhonetic').value,
+        meaning_bn: document.getElementById('wordMeaning').value,
+        category: category,
+        example: document.getElementById('wordExample').value
+    };
+
+    const endpoint = wordId ? '/api/admin/update-word' : '/api/admin/add-word';
+    if (wordId) payload.word_id = parseInt(wordId);
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            closeWordModal();
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error saving word');
+    }
+}
+
+async function deleteWord(wordId, word) {
+    if (!confirm(`Delete word "${word}"?`)) return;
+    try {
+        const response = await fetch('/api/admin/delete-word', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ word_id: wordId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert('Word deleted');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error deleting word');
+    }
+}
+
+async function importVocabulary(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/admin/import-vocabulary', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (e) {
+        alert('Error importing vocabulary');
+    }
+    input.value = '';
+}
+
+async function generateForCategory(category) {
+    const count = document.getElementById('wordCount').value;
+    const result = document.getElementById('generateResult');
+    const btns = document.querySelectorAll('.gen-cat-btn');
+
+    btns.forEach(b => b.disabled = true);
+    result.classList.remove('hidden');
+    result.className = 'mt-3 p-3 rounded-lg bg-blue-50 text-blue-700 text-sm';
+    result.innerHTML = `Generating ${category.toUpperCase()} words...`;
+
+    try {
+        const response = await fetch('/api/admin/generate-vocabulary', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ count: parseInt(count), category: category })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            result.className = 'mt-3 p-3 rounded-lg bg-green-100 text-green-700 text-sm';
+            result.innerHTML = `Generated ${data.generated} ${category.toUpperCase()} words, saved ${data.saved}.`;
+            loadCategoryStats();
+            searchVocabulary();
+        } else {
+            result.className = 'mt-3 p-3 rounded-lg bg-red-100 text-red-700 text-sm';
+            result.innerHTML = `Error: ${data.message}`;
+        }
+    } catch (e) {
+        result.className = 'mt-3 p-3 rounded-lg bg-red-100 text-red-700 text-sm';
+        result.innerHTML = `Error: ${e.message}`;
+    }
+    btns.forEach(b => b.disabled = false);
+}
+
+let currentImportJobId = null;
+let importPollTimer = null;
+
+async function importWordsWithAI(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const category = document.getElementById('importCategory').value;
+    const result = document.getElementById('importResult');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', category);
+
+    input.disabled = true;
+    result.classList.remove('hidden');
+    result.className = 'mt-3 p-3 rounded-lg bg-blue-50 text-blue-700 text-sm';
+    result.innerHTML = `<span class="animate-pulse">Uploading ${file.name}...</span>`;
+
+    try {
+        const response = await fetch('/api/admin/import-words-with-ai', {
+            method: 'POST',
+            body: formData
+        });
+        let data;
+        try {
+            data = await response.json();
+        } catch (parseErr) {
+            throw new Error('Server returned an invalid response (status ' + response.status + ')');
+        }
+
+        if (data.status === 'processing' && data.job_id) {
+            // Background job started - show progress UI
+            currentImportJobId = data.job_id;
+            result.className = 'mt-3 p-4 rounded-lg bg-indigo-50 text-indigo-700 text-sm border border-indigo-200';
+            result.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-semibold">Processing ${data.new} words...</span>
+                    <button onclick="cancelImportJob()" class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded hover:bg-red-200">Cancel</button>
+                </div>
+                <div class="w-full bg-indigo-200 rounded-full h-2.5 mb-1.5">
+                    <div id="importProgressBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-indigo-500">
+                    <span id="importProgressText">Starting...</span>
+                    <span id="importProgressPct">0%</span>
+                </div>
+            `;
+            pollImportStatus(data.job_id);
+        } else if (data.status === 'success') {
+            // No new words to process
+            result.className = 'mt-3 p-3 rounded-lg bg-green-100 text-green-700 text-sm';
+            result.innerHTML = data.message;
+            input.disabled = false;
+            input.value = '';
+            loadCategoryStats();
+            searchVocabulary();
+        } else {
+            result.className = 'mt-3 p-3 rounded-lg bg-red-100 text-red-700 text-sm';
+            result.innerHTML = 'Error: ' + (data.message || 'Unknown error occurred');
+            input.disabled = false;
+            input.value = '';
+        }
+    } catch (e) {
+        result.className = 'mt-3 p-3 rounded-lg bg-red-100 text-red-700 text-sm';
+        result.innerHTML = 'Error: ' + (e.message || 'Failed to connect to server');
+        input.disabled = false;
+        input.value = '';
+    }
+}
+
+function pollImportStatus(jobId) {
+    if (importPollTimer) clearInterval(importPollTimer);
+
+    importPollTimer = setInterval(async () => {
+        try {
+            const resp = await fetch('/api/admin/import-status/' + jobId);
+            const data = await resp.json();
+
+            const bar = document.getElementById('importProgressBar');
+            const text = document.getElementById('importProgressText');
+            const pct = document.getElementById('importProgressPct');
+
+            if (bar) bar.style.width = data.percentage + '%';
+            if (pct) pct.textContent = data.percentage + '%';
+            if (text) text.textContent = data.processed + ' / ' + data.total + ' words';
+
+            if (data.status === 'completed' || data.status === 'partial' || data.status === 'cancelled') {
+                clearInterval(importPollTimer);
+                importPollTimer = null;
+                currentImportJobId = null;
+
+                const result = document.getElementById('importResult');
+                const fileInput = document.querySelector('input[onchange="importWordsWithAI(this)"]');
+
+                if (data.status === 'cancelled') {
+                    result.className = 'mt-3 p-3 rounded-lg bg-yellow-100 text-yellow-700 text-sm';
+                    result.innerHTML = `Import cancelled. Saved ${data.saved} of ${data.total} words.`;
+                } else if (data.failed > 0) {
+                    result.className = 'mt-3 p-3 rounded-lg bg-green-100 text-green-700 text-sm';
+                    result.innerHTML = `Done! Saved ${data.saved} words. ${data.failed} failed.`;
+                } else {
+                    result.className = 'mt-3 p-3 rounded-lg bg-green-100 text-green-700 text-sm';
+                    result.innerHTML = `Done! All ${data.saved} words saved successfully.`;
+                }
+
+                if (fileInput) { fileInput.disabled = false; fileInput.value = ''; }
+                loadCategoryStats();
+                searchVocabulary();
+            }
+        } catch (e) {
+            // Silently retry on network errors
+        }
+    }, 2000);
+}
+
+async function cancelImportJob() {
+    if (!currentImportJobId) return;
+    try {
+        await fetch('/api/admin/import-cancel/' + currentImportJobId, { method: 'POST' });
+    } catch (e) {}
+}
+
+async function clearAllVocabulary() {
+    const confirmation = prompt('This will DELETE ALL vocabulary words permanently.\n\nTo confirm, type: DELETE ALL WORDS');
+    if (confirmation !== 'DELETE ALL WORDS') {
+        if (confirmation !== null) alert('Confirmation text did not match. Deletion cancelled.');
+        return;
+    }
+    const result = document.getElementById('clearResult');
+    result.classList.remove('hidden');
+    result.className = 'mt-2 text-sm text-gray-500';
+    result.textContent = 'Clearing...';
+
+    try {
+        const response = await fetch('/api/admin/clear-vocabulary', { method: 'POST' });
+        const data = await response.json();
+        if (data.status === 'success') {
+            result.className = 'mt-2 text-sm text-green-600';
+            result.textContent = 'All vocabulary words deleted.';
+            loadCategoryStats();
+            searchVocabulary();
+        } else {
+            result.className = 'mt-2 text-sm text-red-600';
+            result.textContent = 'Error: ' + data.message;
+        }
+    } catch (e) {
+        result.className = 'mt-2 text-sm text-red-600';
+        result.textContent = 'Error: ' + e.message;
+    }
+}
+
+async function loadCategoryStats() {
+    try {
+        const response = await fetch('/api/admin/analytics');
+        const data = await response.json();
+        const cats = data.vocab_categories || {};
+        const grid = document.getElementById('categoryStatsGrid');
+        const total = Object.values(cats).reduce((a, b) => a + b, 0);
+        document.getElementById('totalWordCount').textContent = total + ' total words';
+
+        const catConfig = {
+            ielts: { label: 'IELTS', color: 'bg-blue-500', light: 'bg-blue-50', text: 'text-blue-700' },
+            gre: { label: 'GRE', color: 'bg-purple-500', light: 'bg-purple-50', text: 'text-purple-700' },
+            common: { label: 'Common', color: 'bg-green-500', light: 'bg-green-50', text: 'text-green-700' }
+        };
+
+        grid.innerHTML = Object.entries(catConfig).map(([key, cfg]) => {
+            const count = cats[key] || 0;
+            return `
+                <div class="${cfg.light} rounded-lg p-3 text-center border border-gray-100">
+                    <div class="text-2xl font-bold ${cfg.text}">${count}</div>
+                    <div class="text-xs font-medium ${cfg.text} mt-1">${cfg.label}</div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.log('Stats load error:', e);
+    }
+}
+
+// ==================== ANALYTICS ====================
+async function loadAnalytics() {
+    try {
+        const response = await fetch('/api/admin/analytics');
+        const data = await response.json();
+        if (data.status === 'success') {
+            renderGrowthChart(data.user_growth);
+            renderActivityStats(data.activity, data.stats.total_users);
+            renderDeliveryStats(data.delivery);
+            renderTopUsers(data.top_users);
+            renderVocabChart(data.vocab_categories);
+        }
+    } catch (e) {
+        console.error('Error loading analytics:', e);
+    }
+}
+
+function renderGrowthChart(growth) {
+    const container = document.getElementById('growthChart');
+    if (!growth || growth.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">No data yet</p>';
+        return;
+    }
+
+    const maxCount = Math.max(...growth.map(g => g.count), 1);
+    container.innerHTML = growth.map(g => {
+        const width = Math.max((g.count / maxCount) * 100, 5);
+        return `
+            <div class="chart-bar">
+                <span class="text-xs text-gray-500 w-16">${g.date.slice(5)}</span>
+                <div class="chart-bar-fill" style="width:${width}%"></div>
+                <span class="text-xs font-medium">${g.count}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderActivityStats(activity, totalUsers) {
+    const total = totalUsers || 1;
+    document.getElementById('activeToday').textContent = activity.active_today;
+    document.getElementById('activeWeek').textContent = activity.active_week;
+    document.getElementById('activeMonth').textContent = activity.active_month;
+    document.getElementById('inactiveUsers').textContent = activity.inactive;
+
+    document.getElementById('activeTodayBar').style.width = ((activity.active_today / total) * 100) + '%';
+    document.getElementById('activeWeekBar').style.width = ((activity.active_week / total) * 100) + '%';
+    document.getElementById('activeMonthBar').style.width = ((activity.active_month / total) * 100) + '%';
+    document.getElementById('inactiveBar').style.width = ((activity.inactive / total) * 100) + '%';
+}
+
+function renderDeliveryStats(delivery) {
+    document.getElementById('totalWordsSent').textContent = delivery.total_sent || 0;
+    document.getElementById('usersToday').textContent = delivery.users_today || 0;
+}
+
+function renderTopUsers(users) {
+    const container = document.getElementById('topUsersList');
+    if (!users || users.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">No data yet</p>';
+        return;
+    }
+
+    container.innerHTML = users.map((u, i) => `
+        <div class="flex items-center justify-between p-2 ${i < 3 ? 'bg-yellow-50' : 'bg-gray-50'} rounded">
+            <div>
+                <span class="font-medium">${i + 1}. ${u.name}</span>
+                <span class="text-gray-500 text-xs ml-2">${u.email}</span>
+            </div>
+            <div class="text-sm">
+                <span class="text-orange-600 font-bold">${u.streak} day streak</span>
+                <span class="text-gray-400 ml-2">${u.words_learned} words</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderVocabChart(categories) {
+    const container = document.getElementById('vocabCategoryChart');
+    if (!categories || Object.keys(categories).length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">No data yet</p>';
+        return;
+    }
+
+    const maxCount = Math.max(...Object.values(categories), 1);
+    const colors = { ielts: 'bg-blue-500', gre: 'bg-purple-500', common: 'bg-green-500' };
+
+    container.innerHTML = Object.entries(categories).map(([cat, count]) => {
+        const height = Math.max((count / maxCount) * 100, 10);
+        return `
+            <div class="flex flex-col items-center flex-1">
+                <span class="text-sm font-bold mb-1">${count}</span>
+                <div class="${colors[cat] || 'bg-gray-500'} w-full rounded-t" style="height:${height}%"></div>
+                <span class="text-xs text-gray-600 mt-1 capitalize">${cat}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// ==================== CATEGORY REQUESTS ====================
+async function loadCategoryRequests() {
+    try {
+        const resp = await fetch('/api/admin/category-requests');
+        const data = await resp.json();
+        const tbody = document.getElementById('requestsTableBody');
+
+        if (data.status !== 'success' || !data.requests || data.requests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500">No pending requests</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.requests.map(r => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm">${r.id}</td>
+                <td class="px-4 py-3 text-sm font-medium">${r.user_name}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${r.user_email}</td>
+                <td class="px-4 py-3"><span class="status-badge status-approved">${r.requested_category.toUpperCase()}</span></td>
+                <td class="px-4 py-3 text-sm text-gray-500">${r.created_at}</td>
+                <td class="px-4 py-3">
+                    <button onclick="approveCategoryRequest(${r.id})" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 mr-1">Approve</button>
+                    <button onclick="rejectCategoryRequest(${r.id})" class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">Reject</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Error loading requests:', e);
+    }
+}
+
+async function approveCategoryRequest(requestId) {
+    if (!confirm('Approve this category change?')) return;
+    try {
+        const resp = await fetch('/api/admin/approve-category-request', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ request_id: requestId })
+        });
+        const data = await resp.json();
+        alert(data.message);
+        if (data.status === 'success') loadCategoryRequests();
+    } catch (e) {
+        alert('Error approving request');
+    }
+}
+
+async function rejectCategoryRequest(requestId) {
+    if (!confirm('Reject this category change request?')) return;
+    try {
+        const resp = await fetch('/api/admin/reject-category-request', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ request_id: requestId })
+        });
+        const data = await resp.json();
+        alert(data.message);
+        if (data.status === 'success') loadCategoryRequests();
+    } catch (e) {
+        alert('Error rejecting request');
+    }
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    loadCategoryStats();
+});
+</script>
+{% endblock %}
