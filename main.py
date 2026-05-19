@@ -79,6 +79,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="VocabPro", lifespan=lifespan)
 
+# Global exception handler — log errors instead of generic 500
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    print(f"UNHANDLED ERROR on {request.method} {request.url.path}: {exc}")
+    traceback.print_exc()
+    if request.url.path.startswith("/api/"):
+        return {"status": "error", "message": f"Server error: {str(exc)}"}
+    return HTMLResponse(content=f"<h1>Server Error</h1><pre>{exc}</pre>", status_code=500)
+
 # Session middleware
 app.add_middleware(
     SessionMiddleware,
