@@ -3168,10 +3168,12 @@ def get_top_5_winners(contest_id: int) -> list:
     return winners
 
 
-def generate_contest_questions(contest_id: int, question_count: int = 25) -> dict:
+def generate_contest_questions(contest_id: int, question_count: int = 25, category_hint: str = None) -> dict:
     """Generate mixed Bengali-English questions for a contest.
 
-    Distribution: ~60% from most popular user category, ~40% from others.
+    category_hint:
+      - "general" (daily challenge): use easy general-vocabulary words
+      - None (weekly contest): 60% from most popular user category, 40% from others
     Types: 50% en_to_bn, 50% bn_to_en.
     """
     import json
@@ -3186,45 +3188,66 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
     cursor = conn.cursor()
 
     try:
-        # Step 1: Determine category distribution based on user preferences
-        try:
-            if USE_POSTGRES:
-                cursor.execute("SELECT preferred_category, COUNT(*) as cnt FROM users WHERE preferred_category IS NOT NULL GROUP BY preferred_category ORDER BY cnt DESC")
-            else:
-                cursor.execute("SELECT preferred_category, COUNT(*) as cnt FROM users WHERE preferred_category IS NOT NULL GROUP BY preferred_category ORDER BY cnt DESC")
-            cat_rows = cursor.fetchall()
-            cat_dist = {}
-            for row in cat_rows:
-                cat_dist[row[0]] = row[1]
-        except Exception:
-            cat_dist = {"ielts": 1}
-
-        # Calculate word counts per category
-        primary_cat = max(cat_dist, key=cat_dist.get) if cat_dist else "ielts"
-        primary_count = int(question_count * 0.6)
-        remaining_count = question_count - primary_count
-
-        # Step 2: Fetch words — primary category first
         words = []
-        if USE_POSTGRES:
-            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE LOWER(%s) ORDER BY RANDOM() LIMIT %s", (f"%{primary_cat}%", primary_count))
-        else:
-            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE LOWER(?) ORDER BY RANDOM() LIMIT ?", (f"%{primary_cat}%", primary_count))
-        words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
 
-        # Fetch remaining from other categories
-        seen_ids = {w[0] for w in words}
-        if remaining_count > 0:
+        if category_hint == "general":
+            # Daily challenge: prefer general/easy category words
             if USE_POSTGRES:
-                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (remaining_count * 3,))
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE 'general' ORDER BY RANDOM() LIMIT %s", (question_count,))
             else:
-                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (remaining_count * 3,))
-            for w in cursor.fetchall():
-                if w[0] not in seen_ids:
-                    words.append((w[0], w[1], w[2], w[3]))
-                    seen_ids.add(w[0])
-                if len(words) >= question_count:
-                    break
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE 'general' ORDER BY RANDOM() LIMIT ?", (question_count,))
+            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
+
+            # If not enough general words, fill from any category
+            if len(words) < question_count:
+                seen_ids = {w[0] for w in words}
+                remaining = question_count - len(words)
+                if USE_POSTGRES:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (remaining * 3,))
+                else:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (remaining * 3,))
+                for w in cursor.fetchall():
+                    if w[0] not in seen_ids:
+                        words.append((w[0], w[1], w[2], w[3]))
+                        seen_ids.add(w[0])
+                    if len(words) >= question_count:
+                        break
+        else:
+            # Weekly contest: 60% from most popular user category, 40% from others
+            try:
+                if USE_POSTGRES:
+                    cursor.execute("SELECT preferred_category, COUNT(*) as cnt FROM users WHERE preferred_category IS NOT NULL GROUP BY preferred_category ORDER BY cnt DESC")
+                else:
+                    cursor.execute("SELECT preferred_category, COUNT(*) as cnt FROM users WHERE preferred_category IS NOT NULL GROUP BY preferred_category ORDER BY cnt DESC")
+                cat_rows = cursor.fetchall()
+                cat_dist = {}
+                for row in cat_rows:
+                    cat_dist[row[0]] = row[1]
+            except Exception:
+                cat_dist = {"ielts": 1}
+
+            primary_cat = max(cat_dist, key=cat_dist.get) if cat_dist else "ielts"
+            primary_count = int(question_count * 0.6)
+            remaining_count = question_count - primary_count
+
+            if USE_POSTGRES:
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE LOWER(%s) ORDER BY RANDOM() LIMIT %s", (f"%{primary_cat}%", primary_count))
+            else:
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE LOWER(?) ORDER BY RANDOM() LIMIT ?", (f"%{primary_cat}%", primary_count))
+            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
+
+            seen_ids = {w[0] for w in words}
+            if remaining_count > 0:
+                if USE_POSTGRES:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (remaining_count * 3,))
+                else:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (remaining_count * 3,))
+                for w in cursor.fetchall():
+                    if w[0] not in seen_ids:
+                        words.append((w[0], w[1], w[2], w[3]))
+                        seen_ids.add(w[0])
+                    if len(words) >= question_count:
+                        break
 
         # Fallback if not enough words
         if len(words) < question_count:
@@ -3409,7 +3432,9 @@ def check_and_create_weekly_contest() -> Optional[int]:
 
 
 def ensure_daily_contest() -> Optional[dict]:
-    """Ensure today's daily contest exists. Create if not. Returns contest dict."""
+    """Ensure today's daily contest exists. Create if not. Returns contest dict.
+    Daily challenge uses easy general-vocabulary words, 25 questions, mixed types.
+    """
     import datetime
 
     today = datetime.date.today()
@@ -3441,10 +3466,9 @@ def ensure_daily_contest() -> Optional[dict]:
 
     if row:
         contest_info = {"id": row[0], "name": row[1], "question_count": row[2], "status": row[3]}
-        # Check if this contest has questions, if not regenerate
         existing_questions = get_contest_questions(row[0])
         if not existing_questions:
-            generate_contest_questions(row[0], 25)
+            generate_contest_questions(row[0], 25, category_hint="general")
         return contest_info
 
     # Create today's contest
@@ -3464,8 +3488,7 @@ def ensure_daily_contest() -> Optional[dict]:
     )
 
     if contest_id:
-        generate_contest_questions(contest_id, 25)
-        # Activate immediately
+        generate_contest_questions(contest_id, 25, category_hint="general")
         update_contest_status(contest_id, 'active')
         return {"id": contest_id, "name": contest_name, "question_count": 25, "status": "active"}
 
