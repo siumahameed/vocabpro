@@ -1131,6 +1131,39 @@ async def get_today_leaderboard():
     }
 
 
+@app.get("/api/contests/weekly")
+async def get_weekly_contest(request: Request):
+    """Get this week's Friday contest info"""
+    contest = database.ensure_weekly_contest()
+    if not contest:
+        return {"status": "success", "contest": None, "message": "No weekly contest available"}
+
+    leaderboard = database.get_live_leaderboard(contest["id"], limit=5)
+
+    user_id = request.session.get("user_id")
+    user_participated = False
+    user_rank_info = None
+    if user_id:
+        participation = database.check_user_participation(user_id, contest["id"])
+        if participation:
+            user_participated = True
+            user_rank_info = database.get_user_contest_rank(user_id, contest["id"])
+
+    return {
+        "status": "success",
+        "contest": {
+            "id": contest["id"],
+            "name": contest["name"],
+            "question_count": contest["question_count"],
+            "time_per_question_seconds": contest.get("time_per_question_seconds", 15),
+            "status": contest.get("status", "active"),
+            "user_participated": user_participated,
+            "user_rank": user_rank_info
+        },
+        "leaderboard": leaderboard
+    }
+
+
 @app.get("/api/contests/leaderboard")
 async def get_contest_leaderboard(user: dict = Depends(require_auth)):
     """Get the latest completed contest leaderboard"""
@@ -1223,12 +1256,18 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
             "phonetic": q.get("phonetic", "")
         })
 
+    time_per_q = contest.get("time_per_question_seconds", 0) or 0
+    contest_type = contest.get("contest_type", "daily")
+    total_time = time_per_q * len(quiz_questions) if time_per_q > 0 else 1800
+
     return {
         "status": "success",
         "message": "Quiz started",
         "contest_id": contest_id,
+        "contest_type": contest_type,
         "question_count": len(quiz_questions),
-        "time_limit_seconds": 1800,
+        "time_limit_seconds": total_time,
+        "time_per_question_seconds": time_per_q,
         "questions": quiz_questions
     }
 
@@ -1246,6 +1285,7 @@ async def submit_contest(contest_id: int, data: dict, user: dict = Depends(requi
 
     answers = data.get("answers", {})
     time_taken = data.get("time_taken_seconds", 0)
+    timeouts = data.get("timeouts", 0)
 
     questions = database.get_contest_questions(contest_id)
     question_map = {str(q["question_number"]): q for q in questions}
@@ -1257,13 +1297,15 @@ async def submit_contest(contest_id: int, data: dict, user: dict = Depends(requi
     for q_num, q_data in question_map.items():
         user_answer = answers.get(q_num, "").strip()
 
-        if not user_answer:
+        if not user_answer or user_answer == "timeout":
             skipped_count += 1
         elif user_answer == q_data["correct_answer"]:
             correct_count += 1
         else:
             wrong_count += 1
 
+    # For weekly contest: skipped = 0 points, correct = +1, wrong = -1
+    # For daily contest: same formula
     score = correct_count - wrong_count
     submitted_at = datetime.now().isoformat()
 

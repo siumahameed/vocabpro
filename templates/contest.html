@@ -68,6 +68,17 @@
                     <div id="progress-bar" class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-2 sm:h-3 rounded-full" style="width: 0%"></div>
                 </div>
             </div>
+
+            <!-- Per-Question Timer -->
+            <div id="question-timer-bar" class="hidden mt-3">
+                <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+                    <span>Time for this question</span>
+                    <span id="question-timer-value" class="font-bold text-gray-800">--</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="question-timer-fill" class="h-full bg-green-500 rounded-full transition-all duration-1000" style="width: 100%"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Question Card -->
@@ -177,9 +188,13 @@ let questions = [];
 let answers = {};
 let currentIndex = 0;
 let timerInterval = null;
+let questionTimerInterval = null;
 let startTime = null;
 let endTime = null;
 let timerSeconds = 0;
+let timePerQuestion = 0;
+let questionTimeLeft = 0;
+let contestType = 'daily';
 
 async function loadQuiz() {
     try {
@@ -187,22 +202,29 @@ async function loadQuiz() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'error') {
             alert(data.message);
             window.location.href = '/dashboard';
             return;
         }
-        
+
         questions = data.questions;
+        contestType = data.contest_type || 'daily';
+        timePerQuestion = data.time_per_question_seconds || 0;
         timerSeconds = data.time_limit_seconds || 1800;
         endTime = new Date(Date.now() + timerSeconds * 1000);
         startTime = Date.now();
-        
+
         document.getElementById('total-q').textContent = questions.length;
-        
+
+        // Show per-question timer if applicable
+        if (timePerQuestion > 0) {
+            document.getElementById('question-timer-bar').classList.remove('hidden');
+        }
+
         renderQuestionNav();
         showQuestion(0);
         startTimer();
@@ -241,10 +263,10 @@ function autoSubmit() {
 function showQuestion(index) {
     currentIndex = index;
     const q = questions[index];
-    
+
     document.getElementById('current-q').textContent = index + 1;
     document.getElementById('progress-bar').style.width = `${((index + 1) / questions.length) * 100}%`;
-    
+
     const typeEl = document.getElementById('question-type');
     if (q.type === 'en_to_bn') {
         typeEl.textContent = 'English → Bengali';
@@ -253,32 +275,86 @@ function showQuestion(index) {
         typeEl.textContent = 'Bengali → English';
         document.getElementById('question-text').textContent = q.question;
     }
-    
+
     document.getElementById('phonetic').textContent = q.phonetic || '';
-    
+
     const options = document.querySelectorAll('.option-btn');
     options.forEach((btn, i) => {
         btn.textContent = q.options[i];
         btn.classList.remove('selected', 'locked');
         btn.onclick = () => selectOption(i);
     });
-    
+
     if (answers[index] !== undefined) {
         options[answers[index]].classList.add('selected');
     }
-    
+
+    // Start per-question timer
+    startQuestionTimer();
+
     updateNavButtons();
     updateQuestionNav();
     updateScoreDisplay();
 }
 
+function startQuestionTimer() {
+    if (questionTimerInterval) clearInterval(questionTimerInterval);
+    if (timePerQuestion <= 0) return;
+    if (answers[currentIndex] !== undefined) {
+        // Already answered, hide timer
+        document.getElementById('question-timer-value').textContent = '--';
+        document.getElementById('question-timer-fill').style.width = '0%';
+        return;
+    }
+
+    questionTimeLeft = timePerQuestion;
+    updateQuestionTimerDisplay();
+
+    questionTimerInterval = setInterval(() => {
+        questionTimeLeft--;
+        updateQuestionTimerDisplay();
+
+        if (questionTimeLeft <= 0) {
+            clearInterval(questionTimerInterval);
+            // Mark as timeout (skipped)
+            answers[currentIndex] = -1; // special marker for timeout
+            // Auto-advance
+            if (currentIndex < questions.length - 1) {
+                showQuestion(currentIndex + 1);
+            } else {
+                checkAutoSubmit();
+            }
+        }
+    }, 1000);
+}
+
+function updateQuestionTimerDisplay() {
+    const el = document.getElementById('question-timer-value');
+    const fill = document.getElementById('question-timer-fill');
+    if (el) el.textContent = questionTimeLeft + 's';
+    if (fill) {
+        const pct = (questionTimeLeft / timePerQuestion) * 100;
+        fill.style.width = pct + '%';
+        if (pct <= 25) {
+            fill.className = 'h-full bg-red-500 rounded-full transition-all duration-1000';
+        } else if (pct <= 50) {
+            fill.className = 'h-full bg-amber-500 rounded-full transition-all duration-1000';
+        } else {
+            fill.className = 'h-full bg-green-500 rounded-full transition-all duration-1000';
+        }
+    }
+}
+
 function selectOption(index) {
     const q = questions[currentIndex];
     const options = document.querySelectorAll('.option-btn');
-    
+
     options.forEach(btn => btn.classList.remove('selected'));
     options[index].classList.add('selected');
-    
+
+    // Stop per-question timer
+    if (questionTimerInterval) clearInterval(questionTimerInterval);
+
     answers[currentIndex] = index;
     updateScoreDisplay();
     updateQuestionNav();
@@ -357,38 +433,57 @@ function updateQuestionNav() {
 
 async function submitQuiz() {
     clearInterval(timerInterval);
-    
+    if (questionTimerInterval) clearInterval(questionTimerInterval);
+
     const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-    
+
     const formattedAnswers = {};
+    let timeouts = 0;
     questions.forEach((q, i) => {
-        if (answers[i] !== undefined) {
+        if (answers[i] === -1) {
+            // Timed out
+            formattedAnswers[q.number] = 'timeout';
+            timeouts++;
+        } else if (answers[i] !== undefined) {
             formattedAnswers[q.number] = q.options[answers[i]];
         } else {
             formattedAnswers[q.number] = '';
         }
     });
-    
+
     try {
         const response = await fetch(`${API_BASE}/${contestId}/submit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 answers: formattedAnswers,
-                time_taken_seconds: timeTaken
+                time_taken_seconds: timeTaken,
+                timeouts: timeouts
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'success') {
             document.getElementById('results-modal').classList.remove('hidden');
+            if (data.result && data.result.rank) {
+                document.getElementById('results-rank').textContent =
+                    'Your Rank: #' + data.result.rank.rank + ' out of ' + data.result.rank.total_participants;
+            }
         } else {
             alert(data.message || 'Failed to submit quiz');
         }
     } catch (error) {
         console.error('Error submitting quiz:', error);
         alert('Failed to submit quiz. Please try again.');
+    }
+}
+
+function checkAutoSubmit() {
+    // Check if all questions are answered or timed out
+    const allDone = questions.every((q, i) => answers[i] !== undefined);
+    if (allDone) {
+        submitQuiz();
     }
 }
 

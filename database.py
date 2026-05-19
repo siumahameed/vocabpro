@@ -2342,7 +2342,7 @@ def init_contest_tables():
 
 
 def migrate_contest_fields():
-    """Add contest-related fields to users table"""
+    """Add contest-related fields to users table and contest tables"""
     conn = get_db_connection()
     if not conn:
         return False
@@ -2350,6 +2350,18 @@ def migrate_contest_fields():
     cursor = conn.cursor()
 
     try:
+        # Add columns to quiz_contests for weekly contest
+        if USE_POSTGRES:
+            cursor.execute("ALTER TABLE quiz_contests ADD COLUMN IF NOT EXISTS contest_type TEXT DEFAULT 'daily'")
+            cursor.execute("ALTER TABLE quiz_contests ADD COLUMN IF NOT EXISTS time_per_question_seconds INTEGER DEFAULT 0")
+        else:
+            cursor.execute("PRAGMA table_info(quiz_contests)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'contest_type' not in columns:
+                cursor.execute("ALTER TABLE quiz_contests ADD COLUMN contest_type TEXT DEFAULT 'daily'")
+            if 'time_per_question_seconds' not in columns:
+                cursor.execute("ALTER TABLE quiz_contests ADD COLUMN time_per_question_seconds INTEGER DEFAULT 0")
+
         if USE_POSTGRES:
             cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS total_contests_participated INTEGER DEFAULT 0")
             cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS best_contest_rank INTEGER")
@@ -2374,27 +2386,27 @@ def migrate_contest_fields():
         conn.close()
 
 
-def create_contest(name: str, week_number: int, year: int, start_time: str, end_time: str, reveal_time: str, question_count: int = 25) -> Optional[int]:
+def create_contest(name: str, week_number: int, year: int, start_time: str, end_time: str, reveal_time: str, question_count: int = 25, contest_type: str = 'daily', time_per_question_seconds: int = 0) -> Optional[int]:
     """Create a new quiz contest"""
     conn = get_db_connection()
     if not conn:
         return None
-    
+
     cursor = conn.cursor()
-    
+
     try:
         if USE_POSTGRES:
             cursor.execute("""
-                INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'upcoming')
+                INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status, contest_type, time_per_question_seconds)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'upcoming', %s, %s)
                 RETURNING id
-            """, (name, week_number, year, start_time, end_time, reveal_time, question_count))
+            """, (name, week_number, year, start_time, end_time, reveal_time, question_count, contest_type, time_per_question_seconds))
             contest_id = cursor.fetchone()[0]
         else:
             cursor.execute("""
-                INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'upcoming')
-            """, (name, week_number, year, start_time, end_time, reveal_time, question_count))
+                INSERT INTO quiz_contests (name, week_number, year, start_time, end_time, reveal_time, question_count, status, contest_type, time_per_question_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'upcoming', ?, ?)
+            """, (name, week_number, year, start_time, end_time, reveal_time, question_count, contest_type, time_per_question_seconds))
             contest_id = cursor.lastrowid
 
         conn.commit()
@@ -3110,6 +3122,70 @@ def ensure_daily_contest() -> Optional[dict]:
         # Activate immediately
         update_contest_status(contest_id, 'active')
         return {"id": contest_id, "name": contest_name, "question_count": 25, "status": "active"}
+
+    return None
+
+
+def ensure_weekly_contest() -> Optional[dict]:
+    """Ensure this week's Friday contest exists. Create if not. Returns contest dict."""
+    import datetime
+
+    today = datetime.date.today()
+    # Find the most recent Friday (including today if Friday)
+    days_since_friday = (today.weekday() - 4) % 7
+    friday = today - datetime.timedelta(days=days_since_friday)
+    friday_str = friday.isoformat()
+
+    conn = get_db_connection()
+    if not conn:
+        return None
+
+    cursor = conn.cursor()
+
+    # Check if this week's contest already exists
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT id, name, question_count, status, time_per_question_seconds FROM quiz_contests
+            WHERE contest_type = 'weekly' AND DATE(start_time) = %s
+            LIMIT 1
+        """, (friday_str,))
+    else:
+        cursor.execute("""
+            SELECT id, name, question_count, status, time_per_question_seconds FROM quiz_contests
+            WHERE contest_type = 'weekly' AND DATE(start_time) = ?
+            LIMIT 1
+        """, (friday_str,))
+
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if row:
+        return {"id": row[0], "name": row[1], "question_count": row[2], "status": row[3], "time_per_question_seconds": row[4]}
+
+    # Create this week's Friday contest
+    start_time = datetime.datetime.combine(friday, datetime.time.min).isoformat()
+    end_time = (datetime.datetime.combine(friday, datetime.time.min) + datetime.timedelta(hours=24)).isoformat()
+    reveal_time = end_time
+    week_num = friday.isocalendar()[1]
+    contest_name = f"Weekly Challenge - Week {week_num}"
+
+    contest_id = create_contest(
+        name=contest_name,
+        week_number=week_num,
+        year=friday.year,
+        start_time=start_time,
+        end_time=end_time,
+        reveal_time=reveal_time,
+        question_count=50,
+        contest_type='weekly',
+        time_per_question_seconds=15
+    )
+
+    if contest_id:
+        generate_contest_questions(contest_id, 50)
+        update_contest_status(contest_id, 'active')
+        return {"id": contest_id, "name": contest_name, "question_count": 50, "status": "active", "time_per_question_seconds": 15}
 
     return None
 
