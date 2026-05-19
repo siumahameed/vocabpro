@@ -242,6 +242,49 @@ def init_db():
             except Exception as fix_err:
                 print(f"ID fix note: {fix_err}")
                 conn.rollback()
+
+        # Category requests table
+        if USE_POSTGRES:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS category_requests (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    requested_category TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    resolved_at TIMESTAMP,
+                    resolved_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS category_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    requested_category TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    resolved_at TEXT,
+                    resolved_by TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+
+        # Add missing columns if table already exists
+        for col, col_type in [("resolved_at", "TIMESTAMP"), ("resolved_by", "TEXT")]:
+            try:
+                if USE_POSTGRES:
+                    cursor.execute(f"ALTER TABLE category_requests ADD COLUMN IF NOT EXISTS {col} {col_type}")
+                else:
+                    # SQLite doesn't support IF NOT EXISTS for ADD COLUMN
+                    cursor.execute(f"PRAGMA table_info(category_requests)")
+                    existing_cols = [r[1] for r in cursor.fetchall()]
+                    if col not in existing_cols:
+                        cursor.execute(f"ALTER TABLE category_requests ADD COLUMN {col} {col_type}")
+            except Exception as col_err:
+                print(f"Column migration note: {col_err}")
+
         conn.commit()
     except Exception as e:
         print(f"Migration note: {e}")
@@ -625,41 +668,50 @@ def approve_category_request(request_id: int, admin_user: str) -> bool:
     conn = get_db_connection()
     if not conn:
         return False
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    # Get request
-    if USE_POSTGRES:
-        cursor.execute("SELECT user_id, requested_category FROM category_requests WHERE id = %s AND status = 'pending'", (request_id,))
-    else:
-        cursor.execute("SELECT user_id, requested_category FROM category_requests WHERE id = ? AND status = 'pending'", (request_id,))
+        # Get request
+        if USE_POSTGRES:
+            cursor.execute("SELECT user_id, requested_category FROM category_requests WHERE id = %s AND status = 'pending'", (request_id,))
+        else:
+            cursor.execute("SELECT user_id, requested_category FROM category_requests WHERE id = ? AND status = 'pending'", (request_id,))
 
-    row = cursor.fetchone()
-    if not row:
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            conn.close()
+            return False
+
+        user_id, requested_category = row
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Update request status
+        if USE_POSTGRES:
+            cursor.execute("UPDATE category_requests SET status = 'approved', resolved_at = %s, resolved_by = %s WHERE id = %s",
+                           (now, admin_user, request_id))
+        else:
+            cursor.execute("UPDATE category_requests SET status = 'approved', resolved_at = ?, resolved_by = ? WHERE id = ?",
+                           (now, admin_user, request_id))
+
+        # Update user's category
+        if USE_POSTGRES:
+            cursor.execute("UPDATE users SET preferred_category = %s WHERE id = %s", (requested_category, user_id))
+        else:
+            cursor.execute("UPDATE users SET preferred_category = ? WHERE id = ?", (requested_category, user_id))
+
+        conn.commit()
         cursor.close()
         conn.close()
-        return False
-
-    user_id, requested_category = row
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Update request status
-    if USE_POSTGRES:
-        cursor.execute("UPDATE category_requests SET status = 'approved', resolved_at = %s, resolved_by = %s WHERE id = %s",
-                       (now, admin_user, request_id))
-    else:
-        cursor.execute("UPDATE category_requests SET status = 'approved', resolved_at = ?, resolved_by = ? WHERE id = ?",
-                       (now, admin_user, request_id))
-
-    # Update user's category
-    if USE_POSTGRES:
-        cursor.execute("UPDATE users SET preferred_category = %s WHERE id = %s", (requested_category, user_id))
-    else:
-        cursor.execute("UPDATE users SET preferred_category = ? WHERE id = ?", (requested_category, user_id))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return True
+        return True
+    except Exception as e:
+        print(f"approve_category_request error: {e}")
+        try:
+            conn.rollback()
+            conn.close()
+        except Exception:
+            pass
+        raise
 
 def reject_category_request(request_id: int, admin_user: str) -> bool:
     """Reject a category change request"""
