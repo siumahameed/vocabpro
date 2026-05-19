@@ -328,10 +328,26 @@ async def admin_page(request: Request, _: bool = Depends(require_admin_session))
     """Admin Panel"""
     if not request.session.get("is_admin"):
         return RedirectResponse("/admin-login")
-    users = database.get_all_users()
-    payments = database.get_pending_payments()
-    stats = database.get_stats()
-    vocabulary = database.get_all_vocabulary()
+    try:
+        users = database.get_all_users()
+    except Exception as e:
+        print(f"Admin get_all_users error: {e}")
+        users = []
+    try:
+        payments = database.get_pending_payments()
+    except Exception as e:
+        print(f"Admin get_pending_payments error: {e}")
+        payments = []
+    try:
+        stats = database.get_stats()
+    except Exception as e:
+        print(f"Admin get_stats error: {e}")
+        stats = {"total_users": 0, "active_subscribers": 0, "trial_users": 0, "pending_payments": 0, "monthly_revenue": 0, "total_revenue": 0}
+    try:
+        vocabulary = database.get_all_vocabulary()
+    except Exception as e:
+        print(f"Admin get_all_vocabulary error: {e}")
+        vocabulary = []
     html = render_page("admin.html", {"request": request, "seo_title": "Admin - VocabPro", "seo_description": SEO_CONFIG["description"], "users": users, "payments": payments, "stats": stats, "vocabulary": vocabulary})
     return HTMLResponse(content=html)
 

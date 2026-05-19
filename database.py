@@ -416,28 +416,36 @@ def get_all_users() -> list:
     conn = get_db_connection()
     if not conn:
         return []
-    
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
-    users = cursor.fetchall()
-    conn.close()
-    
-    if not users:
-        return []
-    
-    result = []
-    for u in users:
-        try:
-            if hasattr(u, '_asdict'):
-                result.append(u._asdict())
-            else:
-                result.append(dict(u))
-        except Exception:
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
+        users = cursor.fetchall()
+        conn.close()
+
+        if not users:
+            return []
+
+        result = []
+        for u in users:
             try:
-                result.append({k: u[i] for i, k in enumerate(u.keys())})
+                if hasattr(u, '_asdict'):
+                    result.append(u._asdict())
+                else:
+                    result.append(dict(u))
             except Exception:
-                pass
-    return result
+                try:
+                    result.append({k: u[i] for i, k in enumerate(u.keys())})
+                except Exception:
+                    pass
+        return result
+    except Exception as e:
+        print(f"get_all_users error: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []
 
 def get_active_subscribers() -> list:
     conn = get_db_connection()
@@ -842,34 +850,42 @@ def get_pending_payments() -> list:
     conn = get_db_connection()
     if not conn:
         return []
-    
-    cursor = conn.cursor()
-    
-    if USE_POSTGRES:
-        cursor.execute("""
-            SELECT p.*, u.name, u.email, u.whatsapp_number
-            FROM payments p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.status = 'pending'
-            ORDER BY p.created_at DESC
-        """)
-    else:
-        cursor.execute("""
-            SELECT p.*, u.name, u.email, u.whatsapp_number
-            FROM payments p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.status = 'pending'
-            ORDER BY p.created_at DESC
-        """)
-    
-    payments = cursor.fetchall()
-    conn.close()
-    
-    if not payments:
+
+    try:
+        cursor = conn.cursor()
+
+        if USE_POSTGRES:
+            cursor.execute("""
+                SELECT p.*, u.name, u.email, u.whatsapp_number
+                FROM payments p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.status = 'pending'
+                ORDER BY p.created_at DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT p.*, u.name, u.email, u.whatsapp_number
+                FROM payments p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.status = 'pending'
+                ORDER BY p.created_at DESC
+            """)
+
+        payments = cursor.fetchall()
+        conn.close()
+
+        if not payments:
+            return []
+        if hasattr(payments[0], '_asdict'):
+            return [p._asdict() for p in payments]
+        return _rows_to_dicts(cursor, payments)
+    except Exception as e:
+        print(f"get_pending_payments error: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
         return []
-    if hasattr(payments[0], '_asdict'):
-        return [p._asdict() for p in payments]
-    return _rows_to_dicts(cursor, payments)
 
 def approve_payment(payment_id: int, admin_username: str):
     conn = get_db_connection()
@@ -955,65 +971,73 @@ def get_user_payments(user_id: int) -> list:
     return _rows_to_dicts(cursor, payments)
 
 def get_stats() -> dict:
+    default = {"total_users": 0, "active_subscribers": 0, "trial_users": 0, "pending_payments": 0, "monthly_revenue": 0, "total_revenue": 0}
     conn = get_db_connection()
     if not conn:
-        return {"total_users": 0, "active_subscribers": 0, "trial_users": 0, "pending_payments": 0, "monthly_revenue": 0, "total_revenue": 0}
-    
-    cursor = conn.cursor()
-    
-    if USE_POSTGRES:
-        cursor.execute("SELECT COUNT(*) FROM users")
-        total_users = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = TRUE")
-        active_subscribers = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = FALSE AND trial_ends >= %s", (datetime.now().date().isoformat(),))
-        trial_users = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
-        pending_payments = cursor.fetchone()[0]
-        
-        cursor.execute("""
-            SELECT COALESCE(SUM(amount), 0) FROM payments 
-            WHERE status = 'approved' AND verified_at >= date_trunc('month', CURRENT_DATE)
-        """)
-        monthly_revenue = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'approved'")
-        total_revenue = cursor.fetchone()[0]
-    else:
-        cursor.execute("SELECT COUNT(*) FROM users")
-        total_users = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = 1")
-        active_subscribers = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = 0 AND trial_ends >= ?", (datetime.now().date().isoformat(),))
-        trial_users = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
-        pending_payments = cursor.fetchone()[0]
-        
-        cursor.execute("""
-            SELECT COALESCE(SUM(amount), 0) FROM payments 
-            WHERE status = 'approved' AND verified_at >= date('now', 'start of month')
-        """)
-        monthly_revenue = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'approved'")
-        total_revenue = cursor.fetchone()[0]
-    
-    conn.close()
-    
-    return {
-        "total_users": total_users,
-        "active_subscribers": active_subscribers,
-        "trial_users": trial_users,
-        "pending_payments": pending_payments,
-        "monthly_revenue": monthly_revenue,
-        "total_revenue": total_revenue
-    }
+        return default
+
+    try:
+        cursor = conn.cursor()
+
+        if USE_POSTGRES:
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = TRUE")
+            active_subscribers = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = FALSE AND trial_ends >= %s", (datetime.now().date().isoformat(),))
+            trial_users = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
+            pending_payments = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM payments
+                WHERE status = 'approved' AND verified_at >= date_trunc('month', CURRENT_DATE)
+            """)
+            monthly_revenue = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'approved'")
+            total_revenue = cursor.fetchone()[0]
+        else:
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = 1")
+            active_subscribers = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_paid = 0 AND trial_ends >= ?", (datetime.now().date().isoformat(),))
+            trial_users = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'pending'")
+            pending_payments = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM payments
+                WHERE status = 'approved' AND verified_at >= date('now', 'start of month')
+            """)
+            monthly_revenue = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'approved'")
+            total_revenue = cursor.fetchone()[0]
+
+        conn.close()
+        return {
+            "total_users": total_users,
+            "active_subscribers": active_subscribers,
+            "trial_users": trial_users,
+            "pending_payments": pending_payments,
+            "monthly_revenue": monthly_revenue,
+            "total_revenue": total_revenue
+        }
+    except Exception as e:
+        print(f"get_stats error: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return default
 
 def get_user_stats(user_id: int) -> dict:
     conn = get_db_connection()
