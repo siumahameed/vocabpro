@@ -1147,24 +1147,18 @@ def get_all_vocabulary() -> list:
     conn = get_db_connection()
     if not conn:
         return []
-    
+
     cursor = conn.cursor()
     cursor.execute("SELECT id, word, phonetic, meaning_bn, example, category FROM vocabulary ORDER BY id DESC")
     words = cursor.fetchall()
-    conn.close()
-    
+
     if not words:
+        conn.close()
         return []
-    
-    result = []
-    for w in words:
-        try:
-            if hasattr(w, '_asdict'):
-                result.append(w._asdict())
-            else:
-                result.append(dict(w))
-        except Exception:
-            result.append({'id': w[0], 'word': w[1], 'phonetic': w[2], 'meaning_bn': w[3], 'example': w[4]})
+
+    columns = [desc[0] for desc in cursor.description]
+    result = [dict(zip(columns, row)) for row in words]
+    conn.close()
     return result
 
 def get_existing_words(word_list: list) -> set:
