@@ -291,7 +291,7 @@
                                 <td>
                                     <span class="status-badge status-{{ payment.status }}">{{ payment.status|capitalize }}</span>
                                 </td>
-                                <td class="hidden lg:table-cell">{{ payment.created_at[:16] }}</td>
+                                <td class="hidden lg:table-cell">{{ payment.created_at|string|truncate(16, True, '') }}</td>
                                 <td>
                                     {% if payment.status == 'pending' %}
                                     <div class="flex gap-2">
