@@ -833,7 +833,8 @@ async function loadContestData() {
             if (contest.user_participated) {
                 btn.textContent = 'Already Completed Today';
                 btn.className = 'block w-full text-center px-4 py-2.5 bg-white/20 text-white rounded-xl text-sm font-medium cursor-not-allowed';
-                btn.href = '#';
+                btn.removeAttribute('href');
+                btn.removeAttribute('onclick');
                 btn.onclick = function(e) { e.preventDefault(); };
 
                 if (contest.user_rank) {
@@ -844,6 +845,7 @@ async function loadContestData() {
                 btn.textContent = 'Take the Challenge';
                 btn.href = '/contest/' + contest.id;
                 btn.className = 'block w-full text-center px-4 py-2.5 bg-white text-indigo-700 rounded-xl text-sm font-bold hover:bg-indigo-50 transition shadow-lg';
+                btn.removeAttribute('onclick');
                 btn.onclick = null;
             }
 
@@ -948,15 +950,8 @@ function joinDailyChallenge(e) {
     if (dailyContestId) {
         window.location.href = '/contest/' + dailyContestId;
     } else {
-        // Try to fetch contest ID first
-        fetch('/api/contests/current').then(r => r.json()).then(data => {
-            if (data.status === 'success' && data.contest && data.contest.id) {
-                dailyContestId = data.contest.id;
-                window.location.href = '/contest/' + dailyContestId;
-            } else {
-                alert('No active contest available right now.');
-            }
-        }).catch(() => alert('Failed to load contest.'));
+        btn.textContent = 'Loading...';
+        loadContestData();
     }
 }
 
