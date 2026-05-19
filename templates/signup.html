@@ -47,15 +47,27 @@
                     <p id="phoneError" class="mt-1 text-xs text-red-600 hidden"></p>
                 </div>
                 
-                <!-- WhatsApp Number -->
+                <!-- Delivery Channel -->
                 <div>
-                    <label for="whatsapp" class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">+88</span>
-                        <input type="tel" id="whatsapp" name="whatsapp" required class="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 bg-gray-50" placeholder="01XXXXXXXXX" maxlength="11">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">How to receive daily words?</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="delivery_channel" value="email" checked class="peer sr-only">
+                            <div class="border-2 border-gray-200 rounded-lg p-3 text-center peer-checked:border-blue-500 peer-checked:bg-blue-50 transition">
+                                <span class="text-lg">📧</span>
+                                <p class="text-sm font-medium text-gray-700 mt-1">Email</p>
+                                <p class="text-xs text-gray-400">Free, unlimited</p>
+                            </div>
+                        </label>
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="delivery_channel" value="whatsapp" class="peer sr-only">
+                            <div class="border-2 border-gray-200 rounded-lg p-3 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                                <span class="text-lg">💬</span>
+                                <p class="text-sm font-medium text-gray-700 mt-1">WhatsApp</p>
+                                <p class="text-xs text-gray-400">Limited slots</p>
+                            </div>
+                        </label>
                     </div>
-                    <p class="mt-1 text-xs text-gray-500">You'll receive vocabulary words here</p>
-                    <p id="whatsappError" class="mt-1 text-xs text-red-600 hidden"></p>
                 </div>
                 
                 <!-- Password -->
@@ -131,79 +143,66 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const phoneInput = document.getElementById('phone');
-        const whatsappInput = document.getElementById('whatsapp');
-        
-        [phoneInput, whatsappInput].forEach(input => {
-            input.addEventListener('input', function() {
-                this.value = this.value.replace(/\D/g, '');
-            });
-            input.addEventListener('blur', function() {
-                if (input.id === 'phone' && !whatsappInput.value) {
-                    whatsappInput.value = phoneInput.value;
-                }
-            });
+        phoneInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '');
         });
-        
+
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
-        
         togglePassword.addEventListener('click', function() {
             passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
         });
-        
+
         const form = document.getElementById('signupForm');
         const errors = {
             name: document.getElementById('nameError'),
             email: document.getElementById('emailError'),
             phone: document.getElementById('phoneError'),
-            whatsapp: document.getElementById('whatsappError'),
             password: document.getElementById('passwordError'),
             confirm: document.getElementById('confirmError'),
             terms: document.getElementById('termsError')
         };
-        
+
         function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
         function hideError(el) { el.classList.add('hidden'); }
-        
         function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
         function validatePhone(phone) { return /^01\d{9}$/.test(phone); }
-        
+
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             Object.values(errors).forEach(el => hideError(el));
             document.getElementById('formError').classList.add('hidden');
-            
+
             const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
             const phone = document.getElementById('phone').value;
-            const whatsapp = document.getElementById('whatsapp').value;
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             const category = document.getElementById('category').value;
             const terms = document.getElementById('terms').checked;
-            
+            const deliveryChannel = document.querySelector('input[name="delivery_channel"]:checked')?.value || 'email';
+
             let hasError = false;
             if (!name || name.length < 2) { showError(errors.name, 'Name must be at least 2 characters'); hasError = true; }
             if (!email || !validateEmail(email)) { showError(errors.email, 'Please enter a valid email'); hasError = true; }
             if (!phone || !validatePhone(phone)) { showError(errors.phone, 'Enter valid 11-digit number'); hasError = true; }
-            if (!whatsapp || !validatePhone(whatsapp)) { showError(errors.whatsapp, 'Enter valid 11-digit number'); hasError = true; }
             if (!password || password.length < 6) { showError(errors.password, 'Password must be at least 6 characters'); hasError = true; }
             if (password !== confirmPassword) { showError(errors.confirm, 'Passwords do not match'); hasError = true; }
             if (!terms) { showError(errors.terms, 'You must agree to the terms'); hasError = true; }
-            
+
             if (hasError) return;
-            
+
             const submitBtn = document.getElementById('submitBtn');
             const loadingIcon = document.getElementById('loadingIcon');
             submitBtn.disabled = true;
             submitBtn.querySelector('span').textContent = 'Creating Account...';
             loadingIcon.classList.remove('hidden');
-            
+
             try {
                 const response = await fetch('/api/signup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, phone, whatsapp, password, preferred_category: category })
+                    body: JSON.stringify({ name, email, phone, password, preferred_category: category, delivery_channel: deliveryChannel })
                 });
                 const data = await response.json();
                 if (data.status === 'success') {

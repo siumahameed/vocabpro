@@ -195,7 +195,7 @@
                                 <th class="hidden md:table-cell">ID</th>
                                 <th>Name</th>
                                 <th class="hidden md:table-cell">Email</th>
-                                <th class="hidden lg:table-cell">WhatsApp</th>
+                                <th class="hidden lg:table-cell">Channel</th>
                                 <th>Status</th>
                                 <th class="hidden md:table-cell">Streak</th>
                                 <th class="hidden lg:table-cell">Joined</th>
@@ -209,7 +209,7 @@
                                 <td class="hidden md:table-cell">{{ user.id }}</td>
                                 <td>{{ user.name }}</td>
                                 <td class="hidden md:table-cell">{{ user.email }}</td>
-                                <td class="hidden lg:table-cell">{{ user.whatsapp_number }}</td>
+                                <td class="hidden lg:table-cell capitalize">{{ user.delivery_channel or 'email' }}</td>
                                 <td>
                                     <span class="status-badge {% if user.is_paid %}status-paid{% else %}status-trial{% endif %}">
                                         {% if user.is_paid %}Paid{% else %}Trial{% endif %}
@@ -682,7 +682,7 @@ function renderUsersTable(users) {
             <td>${u.id}</td>
             <td>${u.name}</td>
             <td>${u.email}</td>
-            <td>${u.whatsapp_number || ''}</td>
+            <td>${(u.delivery_channel || 'email').charAt(0).toUpperCase() + (u.delivery_channel || 'email').slice(1)}</td>
             <td><span class="status-badge ${u.is_paid ? 'status-paid' : 'status-trial'}">${u.is_paid ? 'Paid' : 'Trial'}</span></td>
             <td>${u.streak_days || 0} days</td>
             <td>${(u.created_at || '').slice(0, 10)}</td>
@@ -753,7 +753,7 @@ async function viewUser(userId) {
                         <div><strong>Name:</strong> ${u.name}</div>
                         <div><strong>Email:</strong> ${u.email}</div>
                         <div><strong>Phone:</strong> ${u.phone}</div>
-                        <div><strong>WhatsApp:</strong> ${u.whatsapp_number || '-'}</div>
+                        <div><strong>Channel:</strong> ${(u.delivery_channel || 'email').charAt(0).toUpperCase() + (u.delivery_channel || 'email').slice(1)}</div>
                         <div><strong>Status:</strong> <span class="status-badge ${u.is_paid ? 'status-paid' : 'status-trial'}">${u.is_paid ? 'Paid' : 'Trial'}</span></div>
                         <div><strong>Trial Ends:</strong> ${u.trial_ends || '-'}</div>
                         <div><strong>Streak:</strong> ${u.streak_days || 0} days</div>

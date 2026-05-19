@@ -56,4 +56,4 @@ document.querySelectorAll('form').forEach(form => {
 
 // Console branding
 console.log('%c VocabPro ', 'background: #2196F3; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold;');
-console.log('Learn English daily via WhatsApp!');
+console.log('Learn English daily with VocabPro!');

@@ -1,6 +1,6 @@
 """
 VocabPro - FastAPI Main Application
-Complete SaaS Platform with WhatsApp Integration
+Complete SaaS Platform with Email Vocabulary Delivery
 """
 
 import os
@@ -43,6 +43,7 @@ def render_page(template_name: str, context: dict):
 # Import modules
 import database
 import whatsapp_bot
+import email_sender
 
 # Initialize database
 database.init_db()
@@ -52,11 +53,11 @@ database.migrate_contest_fields()
 # ==================== CONFIGURATION ====================
 
 SEO_CONFIG = {
-    "title": "VocabPro - Daily English Vocabulary via WhatsApp",
+    "title": "VocabPro - Daily English Vocabulary",
     "description": "Learn 10 new English words every day with Bengali meanings. Perfect for IELTS, GRE & Language Learners in Bangladesh.",
-    "keywords": "vocabulary, english learning, whatsapp, bangladesh, ielts, gre, daily words",
+    "keywords": "vocabulary, english learning, email, bangladesh, ielts, gre, daily words",
     "author": "Sium",
-    "og_title": "VocabPro - Learn English via WhatsApp",
+    "og_title": "VocabPro - Learn English Vocabulary Daily",
     "og_description": "10 new vocabulary words daily with Bengali meanings. Start free!",
     "og_url": "https://vocabpro.com",
     "og_image": "/static/logo.png"
@@ -137,8 +138,8 @@ class UserSignup(BaseModel):
     email: str
     phone: str
     password: str
-    whatsapp: str
     preferred_category: str = "ielts"
+    delivery_channel: str = "email"
 
 class UserLogin(BaseModel):
     email: str
@@ -216,27 +217,40 @@ async def update_profile(data: dict, user: dict = Depends(require_auth)):
     """Update user profile"""
     name = data.get("name", "").strip()
     phone = data.get("phone", "").strip()
-    whatsapp_number = data.get("whatsapp_number", "").strip()
     preferred_time = data.get("preferred_time", "09:30")
     timezone = data.get("timezone", "Asia/Dhaka")
-    
+    delivery_channel = data.get("delivery_channel", "email")
+
     if not name:
         return {"status": "error", "message": "Name is required"}
-    
-    if not phone or not whatsapp_number:
-        return {"status": "error", "message": "Phone and WhatsApp number are required"}
-    
+
+    if not phone:
+        return {"status": "error", "message": "Phone number is required"}
+
+    if delivery_channel not in ["email", "whatsapp", "both"]:
+        delivery_channel = "email"
+
     success = database.update_user_profile(user["id"], {
         "name": name,
         "phone": phone,
-        "whatsapp_number": whatsapp_number,
         "preferred_time": preferred_time,
         "timezone": timezone
     })
-    
+
     if success:
+        database.update_delivery_channel(user["id"], delivery_channel)
         return {"status": "success", "message": "Profile updated successfully!"}
     return {"status": "error", "message": "Failed to update profile"}
+
+@app.post("/api/update-delivery-channel")
+async def update_delivery_channel(data: dict, user: dict = Depends(require_auth)):
+    """Update user's delivery channel preference"""
+    channel = data.get("channel", "email")
+    if channel not in ["email", "whatsapp", "both"]:
+        return {"status": "error", "message": "Invalid channel. Use email, whatsapp, or both."}
+    if database.update_delivery_channel(user["id"], channel):
+        return {"status": "success", "message": f"Delivery channel updated to {channel}"}
+    return {"status": "error", "message": "Failed to update delivery channel"}
 
 @app.post("/api/profile/change-password")
 async def change_password(data: dict, user: dict = Depends(require_auth)):
@@ -365,74 +379,51 @@ import secrets
 
 @app.post("/api/forgot-password")
 async def forgot_password(data: dict):
-    """Forgot Password API - Send reset code via WhatsApp"""
-    import random
-    
-    phone = data.get("phone", "").strip()
-    
-    if not phone:
-        return {"status": "error", "message": "WhatsApp number is required"}
-    
-    # Find user by WhatsApp number
-    conn = database.get_db_connection()
-    if not conn:
-        return {"status": "error", "message": "Database error"}
-    
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE whatsapp_number = ?", (phone,))
-    user = cursor.fetchone()
-    conn.close()
-    
+    """Forgot Password API - Send reset code via Email"""
+    email_addr = data.get("email", "").strip()
+
+    if not email_addr:
+        return {"status": "error", "message": "Email is required"}
+
+    # Find user by email
+    user = database.get_user_by_email(email_addr)
     if not user:
-        return {"status": "error", "message": "No account found with this WhatsApp number"}
-    
-    user = dict(user)
-    
+        return {"status": "error", "message": "No account found with this email"}
+
     # Generate 6-digit reset code
+    import random
     reset_code = ''.join(secrets.choice('0123456789') for _ in range(6))
 
     # Store code in database (expires in 30 minutes)
     from datetime import datetime, timedelta
     expires_at = (datetime.now() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
-    whatsapp_number = user.get("whatsapp_number", "")
 
-    if not database.store_reset_code(whatsapp_number, reset_code, expires_at):
+    if not database.store_reset_code(email_addr, reset_code, expires_at):
         return {"status": "error", "message": "Failed to generate reset code"}
 
-    # Create reset message
-    message = f"""🔐 VocabPro Password Reset
-
-Your password reset code is: *{reset_code}*
-
-Use this code to reset your password.
-Code expires in 30 minutes.
-
-If you didn't request this, ignore this message."""
-
-    # Send via WhatsApp
-    if whatsapp_number:
-        whatsapp_bot.send_whatsapp_message(whatsapp_number, message)
+    # Send via email
+    email_sender.send_password_reset_email(user, reset_code)
 
     return {
         "status": "success",
-        "message": f"Reset code sent to {whatsapp_number[-4:]}****. Check your WhatsApp!"
+        "message": f"Reset code sent to {email_addr[:3]}***@{email_addr.split('@')[-1]}. Check your email!"
     }
 
 @app.post("/api/reset-password")
 async def reset_password(data: dict):
     """Reset Password API"""
-    phone = data.get("phone", "").strip()
+    email_addr = data.get("email", "").strip()
     code = data.get("code", "").strip()
     new_password = data.get("new_password", "")
 
-    if not phone or not code or not new_password:
+    if not email_addr or not code or not new_password:
         return {"status": "error", "message": "All fields are required"}
 
     if len(new_password) < 6:
         return {"status": "error", "message": "Password must be at least 6 characters"}
 
     # Verify the reset code
-    if not database.verify_reset_code(phone, code):
+    if not database.verify_reset_code(email_addr, code):
         return {"status": "error", "message": "Invalid or expired reset code. Please request a new one."}
 
     # Reset password
@@ -446,16 +437,16 @@ async def reset_password(data: dict):
     cursor = conn.cursor()
     try:
         if database.USE_POSTGRES:
-            cursor.execute("UPDATE users SET password_hash = %s WHERE whatsapp_number = %s", (password_hash, phone))
+            cursor.execute("UPDATE users SET password_hash = %s WHERE email = %s", (password_hash, email_addr))
         else:
-            cursor.execute("UPDATE users SET password_hash = ? WHERE whatsapp_number = ?", (password_hash, phone))
+            cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email_addr))
         conn.commit()
     finally:
         cursor.close()
         conn.close()
 
     # Clear the reset code so it can't be reused
-    database.clear_reset_code(phone)
+    database.clear_reset_code(email_addr)
 
     return {"status": "success", "message": "Password reset successful! You can now login with your new password."}
 
@@ -467,25 +458,26 @@ async def signup(user: UserSignup):
     # Check if email exists
     if database.get_user_by_email(user.email):
         return {"status": "error", "message": "Email already registered"}
-    
+
     # Create user
     category = user.preferred_category if user.preferred_category in VALID_CATEGORIES else "ielts"
+    channel = user.delivery_channel if user.delivery_channel in ["email", "whatsapp", "both"] else "email"
     user_id = database.create_user(
         name=user.name,
         email=user.email,
         phone=user.phone,
         password=user.password,
-        whatsapp=user.whatsapp,
+        delivery_channel=channel,
         preferred_category=category
     )
-    
+
     if not user_id:
         return {"status": "error", "message": "Failed to create account"}
-    
-    # Send welcome message
-    whatsapp_bot.send_welcome_to_user(user.whatsapp, user.name)
-    
-    return {"status": "success", "message": "Account created! Check your WhatsApp for welcome message."}
+
+    # Send welcome email
+    email_sender.send_welcome_email({"name": user.name, "email": user.email})
+
+    return {"status": "success", "message": "Account created! Check your email for welcome message."}
 
 @app.post("/api/login")
 async def login(user: UserLogin, request: Request):
@@ -1526,20 +1518,29 @@ async def chatbot_clear(data: dict, user: dict = Depends(require_auth)):
 
 def send_daily_vocabulary():
     """Send daily vocabulary to all active subscribers"""
-    # Get current hour in HH:MM format
     current_time = datetime.now().strftime("%H:%M")
-    
     print(f"[{datetime.now()}] Checking for users with preferred time: {current_time}")
-    
-    # Get users who want messages at this time
+
     users = database.get_users_by_time(current_time)
-    
-    if users:
-        print(f"Found {len(users)} users wanting words at {current_time}")
-        result = whatsapp_bot.send_to_all_subscribers(users)
-        print(f"Daily vocab sent: {result}")
-    else:
+    if not users:
         print(f"No users scheduled for {current_time}")
+        return
+
+    print(f"Found {len(users)} users wanting words at {current_time}")
+
+    # Split by delivery channel
+    email_users = [u for u in users if u.get("delivery_channel", "email") in ("email", "both")]
+    whatsapp_users = [u for u in users if u.get("delivery_channel") in ("whatsapp", "both")]
+
+    if email_users:
+        print(f"Sending to {len(email_users)} email users...")
+        result = email_sender.send_to_email_subscribers(email_users)
+        print(f"Email result: {result}")
+
+    if whatsapp_users:
+        print(f"Sending to {len(whatsapp_users)} WhatsApp users...")
+        result = whatsapp_bot.send_to_all_subscribers(whatsapp_users)
+        print(f"WhatsApp result: {result}")
 
 # ==================== MAIN ====================
 

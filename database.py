@@ -181,6 +181,19 @@ def init_db():
     except Exception as e:
         print(f"Migration note: {e}")
 
+    # Migration: add delivery_channel column if missing
+    try:
+        if USE_POSTGRES:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS delivery_channel TEXT DEFAULT 'email'")
+        else:
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'delivery_channel' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN delivery_channel TEXT DEFAULT 'email'")
+        conn.commit()
+    except Exception as e:
+        print(f"Migration note: {e}")
+
     # Chat messages table
     try:
         if USE_POSTGRES:
@@ -243,7 +256,7 @@ import string
 def generate_referral_code() -> str:
     return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
-def create_user(name: str, email: str, phone: str, password: str, whatsapp: str, referred_by: int = None, preferred_category: str = "ielts") -> Optional[int]:
+def create_user(name: str, email: str, phone: str, password: str, delivery_channel: str = "email", referred_by: int = None, preferred_category: str = "ielts") -> Optional[int]:
     conn = get_db_connection()
     if not conn:
         return None
@@ -257,24 +270,24 @@ def create_user(name: str, email: str, phone: str, password: str, whatsapp: str,
 
         if USE_POSTGRES:
             cursor.execute("""
-                INSERT INTO users (name, email, phone, password_hash, whatsapp_number, trial_ends, is_subscribed, referral_code, referred_by, preferred_category)
-                VALUES (%s, %s, %s, %s, %s, %s, TRUE, %s, %s, %s)
+                INSERT INTO users (name, email, phone, password_hash, whatsapp_number, trial_ends, is_subscribed, referral_code, referred_by, preferred_category, delivery_channel)
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE, %s, %s, %s, %s)
                 RETURNING id
-            """, (name, email, phone, password_hash, whatsapp, trial_end, referral_code, referred_by, preferred_category))
+            """, (name, email, phone, password_hash, phone, trial_end, referral_code, referred_by, preferred_category, delivery_channel))
             user_id = cursor.fetchone()[0]
         else:
             cursor.execute("""
-                INSERT INTO users (name, email, phone, password_hash, whatsapp_number, trial_ends, is_subscribed, referral_code, referred_by, preferred_category)
-                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-            """, (name, email, phone, password_hash, whatsapp, trial_end, referral_code, referred_by, preferred_category))
+                INSERT INTO users (name, email, phone, password_hash, whatsapp_number, trial_ends, is_subscribed, referral_code, referred_by, preferred_category, delivery_channel)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+            """, (name, email, phone, password_hash, phone, trial_end, referral_code, referred_by, preferred_category, delivery_channel))
             user_id = cursor.lastrowid
-        
+
         if referred_by:
             if USE_POSTGRES:
                 cursor.execute("UPDATE users SET referral_count = referral_count + 1 WHERE id = %s", (referred_by,))
             else:
                 cursor.execute("UPDATE users SET referral_count = referral_count + 1 WHERE id = ?", (referred_by,))
-        
+
         conn.commit()
         cursor.close()
         conn.close()
@@ -329,26 +342,27 @@ def update_user_profile(user_id: int, data: dict) -> bool:
     conn = get_db_connection()
     if not conn:
         return False
-    
+
     cursor = conn.cursor()
+    phone = data.get("phone")
     try:
         if USE_POSTGRES:
             cursor.execute("""
-                UPDATE users SET 
-                    name = %s, phone = %s, whatsapp_number = %s, 
+                UPDATE users SET
+                    name = %s, phone = %s, whatsapp_number = %s,
                     preferred_time = %s, timezone = %s
                 WHERE id = %s
-            """, (data.get("name"), data.get("phone"), data.get("whatsapp_number"),
+            """, (data.get("name"), phone, phone,
                   data.get("preferred_time"), data.get("timezone"), user_id))
         else:
             cursor.execute("""
-                UPDATE users SET 
-                    name = ?, phone = ?, whatsapp_number = ?, 
+                UPDATE users SET
+                    name = ?, phone = ?, whatsapp_number = ?,
                     preferred_time = ?, timezone = ?
                 WHERE id = ?
-            """, (data.get("name"), data.get("phone"), data.get("whatsapp_number"),
+            """, (data.get("name"), phone, phone,
                   data.get("preferred_time"), data.get("timezone"), user_id))
-        
+
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
@@ -660,7 +674,7 @@ def reject_category_request(request_id: int, admin_user: str) -> bool:
     return success
     return success
 
-def store_reset_code(whatsapp_number: str, code: str, expires_at: str) -> bool:
+def store_reset_code(email: str, code: str, expires_at: str) -> bool:
     """Store a password reset code for a user"""
     conn = get_db_connection()
     if not conn:
@@ -668,11 +682,11 @@ def store_reset_code(whatsapp_number: str, code: str, expires_at: str) -> bool:
     cursor = conn.cursor()
     try:
         if USE_POSTGRES:
-            cursor.execute("UPDATE users SET reset_code = %s, reset_code_expires = %s WHERE whatsapp_number = %s",
-                           (code, expires_at, whatsapp_number))
+            cursor.execute("UPDATE users SET reset_code = %s, reset_code_expires = %s WHERE email = %s",
+                           (code, expires_at, email))
         else:
-            cursor.execute("UPDATE users SET reset_code = ?, reset_code_expires = ? WHERE whatsapp_number = ?",
-                           (code, expires_at, whatsapp_number))
+            cursor.execute("UPDATE users SET reset_code = ?, reset_code_expires = ? WHERE email = ?",
+                           (code, expires_at, email))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
@@ -682,7 +696,7 @@ def store_reset_code(whatsapp_number: str, code: str, expires_at: str) -> bool:
         cursor.close()
         conn.close()
 
-def verify_reset_code(whatsapp_number: str, code: str) -> bool:
+def verify_reset_code(email: str, code: str) -> bool:
     """Verify a reset code is valid and not expired"""
     conn = get_db_connection()
     if not conn:
@@ -693,13 +707,13 @@ def verify_reset_code(whatsapp_number: str, code: str) -> bool:
         if USE_POSTGRES:
             cursor.execute("""
                 SELECT id FROM users
-                WHERE whatsapp_number = %s AND reset_code = %s AND reset_code_expires > %s
-            """, (whatsapp_number, code, now))
+                WHERE email = %s AND reset_code = %s AND reset_code_expires > %s
+            """, (email, code, now))
         else:
             cursor.execute("""
                 SELECT id FROM users
-                WHERE whatsapp_number = ? AND reset_code = ? AND reset_code_expires > ?
-            """, (whatsapp_number, code, now))
+                WHERE email = ? AND reset_code = ? AND reset_code_expires > ?
+            """, (email, code, now))
         return cursor.fetchone() is not None
     except Exception as e:
         print(f"Error verifying reset code: {e}")
@@ -708,7 +722,7 @@ def verify_reset_code(whatsapp_number: str, code: str) -> bool:
         cursor.close()
         conn.close()
 
-def clear_reset_code(whatsapp_number: str) -> bool:
+def clear_reset_code(email: str) -> bool:
     """Clear reset code after successful password reset"""
     conn = get_db_connection()
     if not conn:
@@ -716,15 +730,35 @@ def clear_reset_code(whatsapp_number: str) -> bool:
     cursor = conn.cursor()
     try:
         if USE_POSTGRES:
-            cursor.execute("UPDATE users SET reset_code = NULL, reset_code_expires = NULL WHERE whatsapp_number = %s",
-                           (whatsapp_number,))
+            cursor.execute("UPDATE users SET reset_code = NULL, reset_code_expires = NULL WHERE email = %s",
+                           (email,))
         else:
-            cursor.execute("UPDATE users SET reset_code = NULL, reset_code_expires = NULL WHERE whatsapp_number = ?",
-                           (whatsapp_number,))
+            cursor.execute("UPDATE users SET reset_code = NULL, reset_code_expires = NULL WHERE email = ?",
+                           (email,))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
         print(f"Error clearing reset code: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_delivery_channel(user_id: int, channel: str) -> bool:
+    """Update user's delivery channel (email/whatsapp/both)"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRES:
+            cursor.execute("UPDATE users SET delivery_channel = %s WHERE id = %s", (channel, user_id))
+        else:
+            cursor.execute("UPDATE users SET delivery_channel = ? WHERE id = ?", (channel, user_id))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Error updating delivery channel: {e}")
         return False
     finally:
         cursor.close()
@@ -2275,11 +2309,13 @@ def build_quiz_questions(user_id: int, category: str = None, count: int = 10, so
     cursor = conn.cursor()
     try:
         # Step 1: Get words
+        words = []
         if source == "random":
             if USE_POSTGRES:
                 cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (count,))
             else:
                 cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (count,))
+            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
         else:
             # Learned words
             if USE_POSTGRES:
@@ -2294,7 +2330,7 @@ def build_quiz_questions(user_id: int, category: str = None, count: int = 10, so
                     FROM daily_progress dp JOIN vocabulary v ON dp.word_id = v.id
                     WHERE dp.user_id = ? ORDER BY RANDOM() LIMIT ?
                 """, (user_id, count))
-            words = cursor.fetchall()
+            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
             if len(words) < 5:
                 # Supplement with random words
                 if USE_POSTGRES:
@@ -2305,21 +2341,18 @@ def build_quiz_questions(user_id: int, category: str = None, count: int = 10, so
                 seen = {w[0] for w in words}
                 for w in extra:
                     if w[0] not in seen:
-                        words.append(w)
+                        words.append((w[0], w[1], w[2], w[3]))
                         seen.add(w[0])
                     if len(words) >= count:
                         break
-            if not words:
-                return []
-            # Convert to list of tuples for consistency
-            words = [(w[0], w[1], w[2], w[3]) for w in words]
-        if source == "random":
-            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()] if not words else words
         if not words:
             return []
 
         word_ids = [w[0] for w in words]
-        exclude_clause = "AND id != ALL(%s)" if USE_POSTGRES else "AND id NOT IN ({})".format(",".join(["?"] * len(word_ids)))
+        if USE_POSTGRES:
+            exclude_clause = "AND id != ALL(%s)"
+        else:
+            exclude_clause = "AND id NOT IN ({})".format(",".join(["?"] * len(word_ids)))
 
         # Step 2: Batch-fetch wrong Bengali meanings
         if category:
@@ -2327,26 +2360,26 @@ def build_quiz_questions(user_id: int, category: str = None, count: int = 10, so
             if USE_POSTGRES:
                 cursor.execute(f"""
                     SELECT id, meaning_bn FROM vocabulary
-                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(%s)
+                    WHERE 1=1 {exclude_clause} AND LOWER(category) LIKE LOWER(%s)
                     ORDER BY RANDOM() LIMIT %s
                 """, (word_ids, cat_pattern, count * 4))
             else:
                 cursor.execute(f"""
                     SELECT id, meaning_bn FROM vocabulary
-                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(?)
+                    WHERE 1=1 {exclude_clause} AND LOWER(category) LIKE LOWER(?)
                     ORDER BY RANDOM() LIMIT ?
                 """, (*word_ids, cat_pattern, count * 4))
         else:
             if USE_POSTGRES:
                 cursor.execute(f"""
                     SELECT id, meaning_bn FROM vocabulary
-                    WHERE {exclude_clause}
+                    WHERE 1=1 {exclude_clause}
                     ORDER BY RANDOM() LIMIT %s
                 """, (word_ids, count * 4))
             else:
                 cursor.execute(f"""
                     SELECT id, meaning_bn FROM vocabulary
-                    WHERE {exclude_clause}
+                    WHERE 1=1 {exclude_clause}
                     ORDER BY RANDOM() LIMIT ?
                 """, (*word_ids, count * 4))
         all_meanings = [(r[0], r[1]) for r in cursor.fetchall()]
@@ -2356,26 +2389,26 @@ def build_quiz_questions(user_id: int, category: str = None, count: int = 10, so
             if USE_POSTGRES:
                 cursor.execute(f"""
                     SELECT id, word FROM vocabulary
-                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(%s)
+                    WHERE 1=1 {exclude_clause} AND LOWER(category) LIKE LOWER(%s)
                     ORDER BY RANDOM() LIMIT %s
                 """, (word_ids, cat_pattern, count * 4))
             else:
                 cursor.execute(f"""
                     SELECT id, word FROM vocabulary
-                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(?)
+                    WHERE 1=1 {exclude_clause} AND LOWER(category) LIKE LOWER(?)
                     ORDER BY RANDOM() LIMIT ?
                 """, (*word_ids, cat_pattern, count * 4))
         else:
             if USE_POSTGRES:
                 cursor.execute(f"""
                     SELECT id, word FROM vocabulary
-                    WHERE {exclude_clause}
+                    WHERE 1=1 {exclude_clause}
                     ORDER BY RANDOM() LIMIT %s
                 """, (word_ids, count * 4))
             else:
                 cursor.execute(f"""
                     SELECT id, word FROM vocabulary
-                    WHERE {exclude_clause}
+                    WHERE 1=1 {exclude_clause}
                     ORDER BY RANDOM() LIMIT ?
                 """, (*word_ids, count * 4))
         all_words = [(r[0], r[1]) for r in cursor.fetchall()]
