@@ -14,6 +14,8 @@ load_dotenv(env_path)
 
 import schedule
 import time
+import threading
+import requests as _requests
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Depends, status
@@ -69,12 +71,35 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "vocabpro123")
 
 # ==================== APP SETUP ====================
 
+def _keep_alive_ping():
+    """Background thread that pings own /health endpoint every 10 minutes to prevent Render cold start."""
+    import os
+    render_url = os.environ.get("RENDER_EXTERNAL_URL")
+    if not render_url:
+        print("Keep-alive: RENDER_EXTERNAL_URL not set, skipping self-ping (local dev)")
+        return
+    ping_url = f"{render_url.rstrip('/')}/health"
+    print(f"Keep-alive started — pinging {ping_url} every 10 minutes")
+    while True:
+        try:
+            time.sleep(600)  # 10 minutes
+            resp = _requests.get(ping_url, timeout=30)
+            print(f"Keep-alive ping: {resp.status_code}")
+        except Exception as e:
+            print(f"Keep-alive ping failed: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Start scheduler - runs every 15 minutes to catch custom time preferences
     schedule.every(15).minutes.do(send_daily_vocabulary)
     print("Scheduler started - Checking every 15 minutes for users")
+
+    # Start keep-alive thread to prevent Render cold starts
+    keep_alive_thread = threading.Thread(target=_keep_alive_ping, daemon=True)
+    keep_alive_thread.start()
+
     yield
 
 app = FastAPI(title="VocabPro", lifespan=lifespan)
