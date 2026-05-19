@@ -1243,22 +1243,35 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
 
     questions = database.shuffle_contest_questions(contest_id)
     if not questions:
-        return {"status": "error", "message": "No questions available"}
+        # Regenerate questions if missing
+        result = database.generate_contest_questions(contest_id, 25)
+        if result.get("success"):
+            questions = database.shuffle_contest_questions(contest_id)
+        if not questions:
+            return {"status": "error", "message": "No questions available"}
 
     quiz_questions = []
     for q in questions:
+        qtype = q.get("question_type", "")
+        if qtype == "en_to_bn":
+            question_text = q["word"]
+            meaning_text = q["word"]
+        else:
+            question_text = q.get("correct_answer", q["word"])
+            meaning_text = q["word"]
         quiz_questions.append({
             "number": q["question_number"],
-            "type": q["question_type"],
-            "question": q["word"] if q["question_type"] == "bn_to_en" else q["word"],
-            "meaning_for_type": q["word"] if q["question_type"] == "en_to_bn" else q["word"],
-            "options": q["options"],
+            "type": qtype,
+            "question": question_text,
+            "meaning_for_type": meaning_text,
+            "options": q.get("options", []),
             "phonetic": q.get("phonetic", "")
         })
 
     time_per_q = contest.get("time_per_question_seconds", 0) or 0
     contest_type = contest.get("contest_type", "daily")
     total_time = time_per_q * len(quiz_questions) if time_per_q > 0 else 1800
+    total_time = max(total_time, 1800)  # minimum 30 min
 
     return {
         "status": "success",

@@ -3178,7 +3178,12 @@ def ensure_daily_contest() -> Optional[dict]:
     conn.close()
 
     if row:
-        return {"id": row[0], "name": row[1], "question_count": row[2], "status": row[3]}
+        contest_info = {"id": row[0], "name": row[1], "question_count": row[2], "status": row[3]}
+        # Check if this contest has questions, if not regenerate
+        existing_questions = get_contest_questions(row[0])
+        if not existing_questions:
+            generate_contest_questions(row[0], 25)
+        return contest_info
 
     # Create today's contest
     start_time = datetime.datetime.combine(today, datetime.time.min).isoformat()
