@@ -3133,16 +3133,15 @@ def ensure_daily_contest() -> Optional[dict]:
 
 
 def ensure_weekly_contest() -> Optional[dict]:
-    """Ensure this week's Friday contest exists. Only returns contest on Fridays."""
+    """Ensure this week's Friday contest exists. Returns contest info with status."""
     import datetime
 
     today = datetime.date.today()
+    is_friday = today.weekday() == 4
 
-    # Only available on Fridays (weekday 4)
-    if today.weekday() != 4:
-        return None
-
-    friday = today
+    # Find this week's Friday
+    days_until_friday = (4 - today.weekday()) % 7
+    friday = today + datetime.timedelta(days=days_until_friday)
     friday_str = friday.isoformat()
 
     conn = get_db_connection()
@@ -3151,7 +3150,7 @@ def ensure_weekly_contest() -> Optional[dict]:
 
     cursor = conn.cursor()
 
-    # Check if today's contest already exists
+    # Check if this week's contest already exists
     if USE_POSTGRES:
         cursor.execute("""
             SELECT id, name, question_count, status, time_per_question_seconds FROM quiz_contests
@@ -3170,9 +3169,10 @@ def ensure_weekly_contest() -> Optional[dict]:
     conn.close()
 
     if row:
-        return {"id": row[0], "name": row[1], "question_count": row[2], "status": row[3], "time_per_question_seconds": row[4]}
+        status = "active" if is_friday else "upcoming"
+        return {"id": row[0], "name": row[1], "question_count": row[2], "status": status, "time_per_question_seconds": row[4]}
 
-    # Create this week's Friday contest
+    # Create this week's Friday contest (even if not Friday yet)
     start_time = datetime.datetime.combine(friday, datetime.time.min).isoformat()
     end_time = (datetime.datetime.combine(friday, datetime.time.min) + datetime.timedelta(hours=24)).isoformat()
     reveal_time = end_time
@@ -3188,13 +3188,15 @@ def ensure_weekly_contest() -> Optional[dict]:
         reveal_time=reveal_time,
         question_count=50,
         contest_type='weekly',
-        time_per_question_seconds=15
+        time_per_question_seconds=9
     )
 
     if contest_id:
         generate_contest_questions(contest_id, 50)
-        update_contest_status(contest_id, 'active')
-        return {"id": contest_id, "name": contest_name, "question_count": 50, "status": "active", "time_per_question_seconds": 15}
+        status = "active" if is_friday else "upcoming"
+        if is_friday:
+            update_contest_status(contest_id, 'active')
+        return {"id": contest_id, "name": contest_name, "question_count": 50, "status": status, "time_per_question_seconds": 9}
 
     return None
 

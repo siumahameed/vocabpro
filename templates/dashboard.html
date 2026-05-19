@@ -277,10 +277,10 @@
                             <span class="text-xl sm:text-2xl">⚡</span>
                             <h3 class="text-base sm:text-xl font-bold truncate" id="weekly-contest-name">Weekly Challenge</h3>
                         </div>
-                        <p class="text-orange-200 text-xs sm:text-sm" id="weekly-contest-desc">50 questions, 15s per question</p>
+                        <p class="text-orange-200 text-xs sm:text-sm" id="weekly-contest-desc">50 questions, 9s per question</p>
                     </div>
-                    <span class="px-2.5 py-1 bg-white/20 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0">
-                        🔥 Friday Special
+                    <span id="weekly-status-badge" class="px-2.5 py-1 bg-white/20 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0">
+                        Loading...
                     </span>
                 </div>
 
@@ -291,7 +291,7 @@
                     </div>
                     <div class="w-px h-8 bg-white/30"></div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl font-bold">15s</p>
+                        <p class="text-2xl sm:text-3xl font-bold">9s</p>
                         <p class="text-xs text-orange-200">Per Q</p>
                     </div>
                     <div class="w-px h-8 bg-white/30"></div>
@@ -887,23 +887,33 @@ async function loadWeeklyContestData() {
             document.getElementById('weekly-contest-name').textContent = contest.name;
 
             const btn = document.getElementById('weekly-participate-btn');
-            if (contest.user_participated) {
+            const badge = document.getElementById('weekly-status-badge');
+
+            if (contest.status === 'upcoming') {
+                // Not Friday yet - show upcoming
+                badge.textContent = 'Upcoming Friday';
+                badge.className = 'px-2.5 py-1 bg-yellow-500/30 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0';
+                btn.textContent = 'Opens Friday';
+                btn.className = 'block w-full text-center px-4 py-2.5 bg-white/20 text-white rounded-xl text-sm font-medium cursor-not-allowed';
+                btn.href = '#';
+                btn.onclick = function(e) { e.preventDefault(); };
+            } else if (contest.user_participated) {
+                badge.textContent = 'Live Now';
+                badge.className = 'px-2.5 py-1 bg-green-500/30 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0';
                 btn.textContent = 'You Already Participated';
                 btn.className = 'block w-full text-center px-4 py-2.5 bg-white/20 text-white rounded-xl text-sm font-medium cursor-not-allowed';
                 btn.href = '#';
                 btn.onclick = function(e) { e.preventDefault(); };
             } else {
+                badge.textContent = 'Live Now';
+                badge.className = 'px-2.5 py-1 bg-green-500/30 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0';
                 btn.textContent = 'Join Weekly Challenge';
                 btn.href = '/contest/' + contest.id;
                 btn.className = 'block w-full text-center px-4 py-2.5 bg-white text-orange-700 rounded-xl text-sm font-bold hover:bg-orange-50 transition shadow-lg';
             }
-        } else {
-            // Not Friday or no contest - hide widget
-            document.getElementById('weekly-contest-widget').classList.add('hidden');
         }
     } catch (error) {
         console.log('Error loading weekly contest:', error);
-        document.getElementById('weekly-contest-widget').classList.add('hidden');
     }
 }
 
