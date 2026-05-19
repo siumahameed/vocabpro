@@ -115,10 +115,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     return HTMLResponse(content=f"<h1>Server Error</h1><pre>{exc}</pre>", status_code=500)
 
 # Session middleware
+SESSION_MAX_AGE = 30 * 24 * 60 * 60  # 30 days in seconds
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     session_cookie="vocabpro_session",
+    max_age=SESSION_MAX_AGE,
     https_only=os.environ.get("SESSION_HTTPS_ONLY", "false").lower() == "true",
     same_site="lax"
 )
@@ -196,7 +199,9 @@ VALID_CATEGORIES = ["ielts", "gre", "common"]
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Landing Page - SEO Optimized"""
+    """Landing Page - SEO Optimized (redirect to dashboard if logged in)"""
+    if request.session.get("user_id"):
+        return RedirectResponse("/dashboard", status_code=302)
     html = render_page("index.html", {
         "request": request,
         "seo_title": SEO_CONFIG["title"],
