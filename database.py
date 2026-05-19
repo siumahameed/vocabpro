@@ -1182,6 +1182,51 @@ def get_existing_words(word_list: list) -> set:
         cursor.close()
         conn.close()
 
+def get_meanings_by_ids(word_ids: list) -> list:
+    """Get meaning_bn for a list of vocabulary word IDs"""
+    if not word_ids:
+        return []
+    conn = get_db_connection()
+    if not conn:
+        return []
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRES:
+            placeholders = ','.join(['%s'] * len(word_ids))
+        else:
+            placeholders = ','.join(['?'] * len(word_ids))
+        cursor.execute(f"SELECT id, meaning_bn FROM vocabulary WHERE id IN ({placeholders})", word_ids)
+        return [{"id": row[0], "meaning_bn": row[1]} for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error getting meanings by IDs: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_meanings_by_words(word_texts: list) -> dict:
+    """Get meaning_bn for a list of word texts. Returns {word_lower: meaning_bn}"""
+    if not word_texts:
+        return {}
+    conn = get_db_connection()
+    if not conn:
+        return {}
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRES:
+            placeholders = ','.join(['%s'] * len(word_texts))
+            cursor.execute(f"SELECT LOWER(word), meaning_bn FROM vocabulary WHERE LOWER(word) IN ({placeholders})", [w.lower() for w in word_texts])
+        else:
+            placeholders = ','.join(['?'] * len(word_texts))
+            cursor.execute(f"SELECT LOWER(word), meaning_bn FROM vocabulary WHERE LOWER(word) IN ({placeholders})", [w.lower() for w in word_texts])
+        return {row[0]: row[1] for row in cursor.fetchall()}
+    except Exception as e:
+        print(f"Error getting meanings by words: {e}")
+        return {}
+    finally:
+        cursor.close()
+        conn.close()
+
 def add_vocabulary_word(word: str, meaning_bn: str, example: str = "", category: str = "", phonetic: str = "") -> bool:
     conn = get_db_connection()
     if not conn:
@@ -2219,6 +2264,163 @@ def update_quiz_score(user_id: int, score: int) -> dict:
     cursor.close()
     conn.close()
     return {"success": True, "new_record": new_record, "high_score": max(current_high, score)}
+
+
+def build_quiz_questions(user_id: int, category: str = None, count: int = 10, source: str = "learned") -> list:
+    """Build quiz questions with all wrong options in a single DB connection (optimized)."""
+    import random as _random
+    conn = get_db_connection()
+    if not conn:
+        return []
+    cursor = conn.cursor()
+    try:
+        # Step 1: Get words
+        if source == "random":
+            if USE_POSTGRES:
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (count,))
+            else:
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (count,))
+        else:
+            # Learned words
+            if USE_POSTGRES:
+                cursor.execute("""
+                    SELECT DISTINCT v.id, v.word, v.meaning_bn, v.phonetic
+                    FROM daily_progress dp JOIN vocabulary v ON dp.word_id = v.id
+                    WHERE dp.user_id = %s ORDER BY RANDOM() LIMIT %s
+                """, (user_id, count))
+            else:
+                cursor.execute("""
+                    SELECT DISTINCT v.id, v.word, v.meaning_bn, v.phonetic
+                    FROM daily_progress dp JOIN vocabulary v ON dp.word_id = v.id
+                    WHERE dp.user_id = ? ORDER BY RANDOM() LIMIT ?
+                """, (user_id, count))
+            words = cursor.fetchall()
+            if len(words) < 5:
+                # Supplement with random words
+                if USE_POSTGRES:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (count,))
+                else:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (count,))
+                extra = cursor.fetchall()
+                seen = {w[0] for w in words}
+                for w in extra:
+                    if w[0] not in seen:
+                        words.append(w)
+                        seen.add(w[0])
+                    if len(words) >= count:
+                        break
+            if not words:
+                return []
+            # Convert to list of tuples for consistency
+            words = [(w[0], w[1], w[2], w[3]) for w in words]
+        if source == "random":
+            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()] if not words else words
+        if not words:
+            return []
+
+        word_ids = [w[0] for w in words]
+        exclude_clause = "AND id != ALL(%s)" if USE_POSTGRES else "AND id NOT IN ({})".format(",".join(["?"] * len(word_ids)))
+
+        # Step 2: Batch-fetch wrong Bengali meanings
+        if category:
+            cat_pattern = f"%{category}%"
+            if USE_POSTGRES:
+                cursor.execute(f"""
+                    SELECT id, meaning_bn FROM vocabulary
+                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(%s)
+                    ORDER BY RANDOM() LIMIT %s
+                """, (word_ids, cat_pattern, count * 4))
+            else:
+                cursor.execute(f"""
+                    SELECT id, meaning_bn FROM vocabulary
+                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(?)
+                    ORDER BY RANDOM() LIMIT ?
+                """, (*word_ids, cat_pattern, count * 4))
+        else:
+            if USE_POSTGRES:
+                cursor.execute(f"""
+                    SELECT id, meaning_bn FROM vocabulary
+                    WHERE {exclude_clause}
+                    ORDER BY RANDOM() LIMIT %s
+                """, (word_ids, count * 4))
+            else:
+                cursor.execute(f"""
+                    SELECT id, meaning_bn FROM vocabulary
+                    WHERE {exclude_clause}
+                    ORDER BY RANDOM() LIMIT ?
+                """, (*word_ids, count * 4))
+        all_meanings = [(r[0], r[1]) for r in cursor.fetchall()]
+
+        # Step 3: Batch-fetch wrong English words
+        if category:
+            if USE_POSTGRES:
+                cursor.execute(f"""
+                    SELECT id, word FROM vocabulary
+                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(%s)
+                    ORDER BY RANDOM() LIMIT %s
+                """, (word_ids, cat_pattern, count * 4))
+            else:
+                cursor.execute(f"""
+                    SELECT id, word FROM vocabulary
+                    WHERE {exclude_clause} AND LOWER(category) LIKE LOWER(?)
+                    ORDER BY RANDOM() LIMIT ?
+                """, (*word_ids, cat_pattern, count * 4))
+        else:
+            if USE_POSTGRES:
+                cursor.execute(f"""
+                    SELECT id, word FROM vocabulary
+                    WHERE {exclude_clause}
+                    ORDER BY RANDOM() LIMIT %s
+                """, (word_ids, count * 4))
+            else:
+                cursor.execute(f"""
+                    SELECT id, word FROM vocabulary
+                    WHERE {exclude_clause}
+                    ORDER BY RANDOM() LIMIT ?
+                """, (*word_ids, count * 4))
+        all_words = [(r[0], r[1]) for r in cursor.fetchall()]
+
+        # Step 4: Build questions
+        wrong_meanings_pool = [m[1] for m in all_meanings]
+        wrong_words_pool = [w[1] for w in all_words]
+
+        questions = []
+        for wid, word, meaning_bn, phonetic in words:
+            # Pick 3 wrong Bengali meanings
+            available_m = [m for m in wrong_meanings_pool if m != meaning_bn]
+            _random.shuffle(available_m)
+            wrong_m = available_m[:3]
+            if len(wrong_m) < 3:
+                continue
+
+            # Pick 3 wrong English words
+            available_w = [w for w in wrong_words_pool if w != word]
+            _random.shuffle(available_w)
+            wrong_w = available_w[:3]
+            if len(wrong_w) < 3:
+                continue
+
+            bengali_options = [meaning_bn] + wrong_m
+            _random.shuffle(bengali_options)
+
+            english_options = [word] + wrong_w
+            _random.shuffle(english_options)
+
+            questions.append({
+                "word": word,
+                "phonetic": phonetic or "",
+                "correct": meaning_bn,
+                "options": bengali_options,
+                "english_options": english_options
+            })
+
+        return questions[:count]
+    except Exception as e:
+        print(f"Error building quiz questions: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # ==================== WEEKLY QUIZ CONTESTS ====================

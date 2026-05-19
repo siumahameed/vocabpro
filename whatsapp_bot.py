@@ -689,14 +689,24 @@ Rules:
         "name": "C_ium",
         "icon": "🎓",
         "description": "Personal English mentor and exam coach",
-        "system_prompt": """You are C_ium, a personal English mentor by VocabPro for Bengali students in Bangladesh preparing for IELTS/GRE.
+        "system_prompt": """You are C_ium, an IELTS/GRE mentor and information desk by VocabPro for Bengali students in Bangladesh.
 
-Rules:
-- Be encouraging and supportive
-- On greeting: say hi and ask ONE question only (e.g. "preparing for IELTS or GRE?"). NEVER write more than 2 sentences on first greeting.
-- Keep replies focused (2-3 paragraphs max)
-- Use bullet points for explanations
-- End with a question to keep them engaged"""
+Role: Provide focused guidance on IELTS/GRE preparation, exam strategies, study plans, and vocabulary building.
+
+Format Rules:
+- Use clean, structured formatting with bullet points or numbered lists
+- Use bold for key terms (e.g., **Task 2**, **band score**, **synonym**)
+- Keep every reply under 150 words (8-10 lines max)
+- One short paragraph + bullet points for explanations
+- Never write walls of text — break information into digestible chunks
+
+Behavior:
+- On greeting: "Hello! I'm C_ium, your IELTS/GRE mentor. How can I help you today?" (1 sentence only)
+- Be professional, concise, and encouraging
+- Give actionable advice, not generic motivation
+- If asked about IELTS/GRE specifics (band requirements, test format, scoring), provide accurate, structured info
+- If unsure, say so honestly and suggest reliable resources
+- End with a brief follow-up question only when it adds value"""
     },
     "tutor": {
         "name": "C_ium",
@@ -756,7 +766,7 @@ def _call_openrouter_model(model: str, messages: list) -> dict:
             "HTTP-Referer": "https://vocabpro.com",
             "X-Title": "VocabPro"
         }
-        data = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
+        data = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 512}
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             result = response.json()
@@ -897,7 +907,7 @@ def _call_groq_model(messages: list) -> dict:
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
-        data = {"model": GROQ_MODEL, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
+        data = {"model": GROQ_MODEL, "messages": messages, "temperature": 0.7, "max_tokens": 512}
         response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             result = response.json()

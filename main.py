@@ -605,60 +605,12 @@ import random as _random
 async def start_quiz(request: Request, type: str = "bengali", source: str = "learned", user: dict = Depends(require_auth)):
     """Start a quiz with random multiple-choice questions"""
     category = user.get("preferred_category", "")
+    questions = database.build_quiz_questions(user["id"], category, count=10, source=source)
 
-    if source == "random":
-        # Random words from all vocabulary
-        words = database.get_learned_words(user["id"], None, count=10, use_user_category=False)
-    else:
-        # Learned words from user's category
-        words = database.get_learned_words(user["id"], category, count=10)
-        # If not enough learned words, supplement with random from any category
-        if len(words) < 5:
-            extra = database.get_learned_words(user["id"], None, count=10 - len(words), use_user_category=False)
-            existing_ids = {w["id"] for w in words}
-            for w in extra:
-                if w["id"] not in existing_ids:
-                    words.append(w)
-                    if len(words) >= 10:
-                        break
-
-    if len(words) < 2:
-        return {"status": "error", "message": "Not enough words available. Need at least 2 words."}
-
-    questions = []
-    for w in words:
-        # Get 3 wrong options for Bengali meanings - try category first, then any
-        wrong_meanings = database.get_wrong_options(w["id"], category, count=3)
-        if len(wrong_meanings) < 3:
-            wrong_meanings += database.get_wrong_options(w["id"], None, count=3 - len(wrong_meanings))
-        if len(wrong_meanings) < 3:
-            continue
-
-        # Get 3 wrong English words - try category first, then any
-        wrong_words = database.get_wrong_english_words(w["id"], category, count=3)
-        if len(wrong_words) < 3:
-            wrong_words += database.get_wrong_english_words(w["id"], None, count=3 - len(wrong_words))
-        if len(wrong_words) < 3:
-            continue
-
-        bengali_options = [w["meaning_bn"]] + wrong_meanings[:3]
-        _random.shuffle(bengali_options)
-
-        english_options = [w["word"]] + wrong_words[:3]
-        _random.shuffle(english_options)
-
-        questions.append({
-            "word": w["word"],
-            "phonetic": w.get("phonetic", ""),
-            "correct": w["meaning_bn"],
-            "options": bengali_options,
-            "english_options": english_options
-        })
-
-    if len(questions) < 1:
+    if not questions:
         return {"status": "error", "message": "Not enough words for a quiz. Add more words to your category."}
 
-    return {"status": "success", "questions": questions[:10], "type": type}
+    return {"status": "success", "questions": questions, "type": type}
 
 
 @app.get("/contest/{contest_id}", response_class=HTMLResponse)
@@ -1250,20 +1202,28 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
         if not questions:
             return {"status": "error", "message": "No questions available"}
 
+    # Pre-fetch Bengali meanings by word text (word_ids may be stale after re-import)
+    word_texts = list(set(q["word"] for q in questions))
+    meaning_map = database.get_meanings_by_words(word_texts)
+
     quiz_questions = []
     for q in questions:
         qtype = q.get("question_type", "")
+        bn_meaning = meaning_map.get(q["word"].lower(), q.get("correct_answer", ""))
+
         if qtype == "en_to_bn":
+            # Show English word, pick Bengali meaning from options
             question_text = q["word"]
-            meaning_text = q["word"]
+            meaning_for_type = q["word"]
         else:
-            question_text = q.get("correct_answer", q["word"])
-            meaning_text = q["word"]
+            # Show Bengali meaning, pick English word from options
+            question_text = bn_meaning
+            meaning_for_type = bn_meaning
         quiz_questions.append({
             "number": q["question_number"],
             "type": qtype,
             "question": question_text,
-            "meaning_for_type": meaning_text,
+            "meaning_for_type": meaning_for_type,
             "options": q.get("options", []),
             "phonetic": q.get("phonetic", "")
         })

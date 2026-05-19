@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Weekly Challenge - VocabPro{% endblock %}
+{% block title %}{{ contest.name }} - VocabPro{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -51,7 +51,7 @@
             <div class="flex justify-between items-start gap-3">
                 <div class="min-w-0">
                     <h1 class="text-lg sm:text-2xl font-bold text-gray-800 truncate">{{ contest.name }}</h1>
-                    <p class="text-gray-500 text-xs sm:text-sm">Weekly Challenge</p>
+                    <p id="contest-subtitle" class="text-gray-500 text-xs sm:text-sm">Loading quiz...</p>
                 </div>
                 <div id="timer" class="timer-display bg-blue-100 text-blue-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-base sm:text-lg whitespace-nowrap flex-shrink-0">
                     <span id="timer-value">--:--:--</span>
@@ -88,7 +88,12 @@
             </div>
 
             <div class="mb-4 sm:mb-6">
-                <p id="question-text" class="text-xl sm:text-3xl font-bold text-gray-800 text-center mb-1 sm:mb-2">Loading...</p>
+                <p id="question-text" class="text-xl sm:text-3xl font-bold text-gray-800 text-center mb-1 sm:mb-2">
+                    <span id="loading-spinner" class="inline-flex items-center gap-2 text-base sm:text-lg text-gray-400">
+                        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        Preparing your quiz...
+                    </span>
+                </p>
                 <p id="phonetic" class="text-gray-400 text-center text-xs sm:text-sm"></p>
             </div>
 
@@ -203,6 +208,10 @@ async function loadQuiz() {
             headers: { 'Content-Type': 'application/json' }
         });
 
+        if (!response.ok) {
+            throw new Error(`Server error (${response.status})`);
+        }
+
         const data = await response.json();
 
         if (data.status === 'error') {
@@ -218,6 +227,14 @@ async function loadQuiz() {
         endTime = new Date(Date.now() + timerSeconds * 1000);
         startTime = Date.now();
 
+        // Set contest subtitle
+        const subtitle = document.getElementById('contest-subtitle');
+        if (contestType === 'weekly') {
+            subtitle.textContent = 'Weekly Challenge';
+        } else {
+            subtitle.textContent = 'Daily Challenge';
+        }
+
         document.getElementById('total-q').textContent = questions.length;
 
         // Show per-question timer if applicable
@@ -230,7 +247,10 @@ async function loadQuiz() {
         startTimer();
     } catch (error) {
         console.error('Error loading quiz:', error);
-        alert('Failed to load quiz. Please try again.');
+        document.getElementById('question-text').innerHTML =
+            '<div class="text-center"><p class="text-red-500 text-base sm:text-lg mb-3">Failed to load quiz</p>' +
+            '<button onclick="location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Retry</button></div>';
+        document.getElementById('contest-subtitle').textContent = 'Error loading quiz';
     }
 }
 
