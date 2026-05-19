@@ -464,8 +464,9 @@ async def signup(user: UserSignup):
     if not user_id:
         return {"status": "error", "message": "Failed to create account"}
 
-    # Send welcome email
-    email_sender.send_welcome_email({"name": user.name, "email": user.email})
+    # Send welcome email (async, non-blocking)
+    import threading
+    threading.Thread(target=email_sender.send_welcome_email, args=({"name": user.name, "email": user.email},), daemon=True).start()
 
     return {"status": "success", "message": "Account created! Check your email for welcome message."}
 
