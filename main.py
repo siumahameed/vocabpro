@@ -295,8 +295,13 @@ async def admin_login_page(request: Request):
     return HTMLResponse(content=html)
 
 @app.post("/api/admin/login")
-async def admin_login(request: Request, data: dict):
+async def admin_login(request: Request):
     """Admin Login API - accepts admin env creds OR any admin user from DB"""
+    try:
+        data = await request.json()
+    except Exception:
+        return {"status": "error", "message": "Invalid request format"}
+
     username = data.get("username", "")
     password = data.get("password", "")
 
@@ -307,11 +312,14 @@ async def admin_login(request: Request, data: dict):
         return {"status": "success", "message": "Login successful"}
 
     # Check database admin users (email + password)
-    user = database.verify_user(username, password)
-    if user and user.get("is_admin"):
-        request.session["is_admin"] = True
-        request.session["admin_user"] = user["email"]
-        return {"status": "success", "message": "Login successful"}
+    try:
+        user = database.verify_user(username, password)
+        if user and user.get("is_admin"):
+            request.session["is_admin"] = True
+            request.session["admin_user"] = user["email"]
+            return {"status": "success", "message": "Login successful"}
+    except Exception as e:
+        print(f"Admin DB login error: {e}")
 
     return {"status": "error", "message": "Invalid username or password"}
 
