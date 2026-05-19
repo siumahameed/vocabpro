@@ -1005,28 +1005,40 @@ async def admin_analytics(_: bool = Depends(require_admin_session)):
 @app.get("/api/contests/current")
 async def get_current_contest_info(request: Request):
     """Get today's daily contest (auto-creates if needed) with live leaderboard"""
-    contest = database.ensure_daily_contest()
+    try:
+        contest = database.ensure_daily_contest()
+    except Exception as e:
+        print(f"Error ensuring daily contest: {e}")
+        return {"status": "error", "message": "Failed to load contest"}
+
     if not contest:
         return {"status": "success", "contest": None, "message": "No active contest"}
 
-    leaderboard = database.get_live_leaderboard(contest["id"], limit=5)
+    try:
+        leaderboard = database.get_live_leaderboard(contest["id"], limit=5)
+    except Exception as e:
+        print(f"Error loading leaderboard: {e}")
+        leaderboard = []
 
     # Check if current user has participated
     user_id = request.session.get("user_id")
     user_participated = False
     user_rank_info = None
     if user_id:
-        participation = database.check_user_participation(user_id, contest["id"])
-        if participation:
-            user_participated = True
-            user_rank_info = database.get_user_contest_rank(user_id, contest["id"])
+        try:
+            participation = database.check_user_participation(user_id, contest["id"])
+            if participation:
+                user_participated = True
+                user_rank_info = database.get_user_contest_rank(user_id, contest["id"])
+        except Exception as e:
+            print(f"Error checking participation: {e}")
 
     return {
         "status": "success",
         "contest": {
             "id": contest["id"],
             "name": contest["name"],
-            "question_count": contest["question_count"],
+            "question_count": contest.get("question_count", 25),
             "status": "active",
             "user_participated": user_participated,
             "user_rank": user_rank_info
