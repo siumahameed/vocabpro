@@ -1674,29 +1674,14 @@ def delete_user(user_id: int) -> bool:
 
     cursor = conn.cursor()
 
+    # Tables that reference user_id (only those that exist)
+    related_tables = ["payments", "quiz_participations", "chat_messages", "category_requests"]
+
     try:
-        if USE_POSTGRES:
-            cursor.execute("DELETE FROM payments WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM user_word_progress WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM quiz_attempts WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM quiz_contest_participation WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM user_achievements WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM chat_messages WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM user_activity WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM vocab_requests WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM category_change_requests WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
-        else:
-            cursor.execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM user_word_progress WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM quiz_attempts WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM quiz_contest_participation WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM user_achievements WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM user_activity WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM vocab_requests WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM category_change_requests WHERE user_id = ?", (user_id,))
-            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        ph = "%s" if USE_POSTGRES else "?"
+        for table in related_tables:
+            cursor.execute(f"DELETE FROM {table} WHERE user_id = {ph}", (user_id,))
+        cursor.execute(f"DELETE FROM users WHERE id = {ph}", (user_id,))
         conn.commit()
         return True
     except Exception as e:
