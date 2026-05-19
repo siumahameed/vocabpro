@@ -1222,8 +1222,12 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
 
     time_per_q = contest.get("time_per_question_seconds", 0) or 0
     contest_type = contest.get("contest_type", "daily")
-    total_time = time_per_q * len(quiz_questions) if time_per_q > 0 else 1800
-    total_time = max(total_time, 1800)  # minimum 30 min
+    if contest_type == "daily":
+        total_time = 180  # 3 minutes for daily challenge
+    elif time_per_q > 0:
+        total_time = time_per_q * len(quiz_questions)
+    else:
+        total_time = 1800  # 30 min default for weekly
 
     return {
         "status": "success",
