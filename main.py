@@ -1008,8 +1008,10 @@ async def get_current_contest_info(request: Request):
     try:
         contest = database.ensure_daily_contest()
     except Exception as e:
+        import traceback
         print(f"Error ensuring daily contest: {e}")
-        return {"status": "error", "message": "Failed to load contest"}
+        traceback.print_exc()
+        return {"status": "error", "message": f"Failed to load contest: {e}"}
 
     if not contest:
         return {"status": "success", "contest": None, "message": "No active contest"}

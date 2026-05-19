@@ -2798,7 +2798,13 @@ def get_contest_questions(contest_id: int) -> list:
     result = []
     for q in questions:
         q_dict = _row_to_dict(cursor, q)
-        q_dict['options'] = json.loads(q_dict['options'])
+        opts = q_dict.get('options', '[]')
+        if isinstance(opts, str):
+            q_dict['options'] = json.loads(opts)
+        elif isinstance(opts, list):
+            q_dict['options'] = opts
+        else:
+            q_dict['options'] = []
         result.append(q_dict)
 
     cursor.close()
@@ -2833,7 +2839,13 @@ def shuffle_contest_questions(contest_id: int) -> list:
     result = []
     for q in questions:
         q_dict = _row_to_dict(cursor, q)
-        q_dict['options'] = json.loads(q_dict['options'])
+        opts = q_dict.get('options', '[]')
+        if isinstance(opts, str):
+            q_dict['options'] = json.loads(opts)
+        elif isinstance(opts, list):
+            q_dict['options'] = opts
+        else:
+            q_dict['options'] = []
         result.append(q_dict)
 
     cursor.close()
