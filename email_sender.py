@@ -1,38 +1,56 @@
 """
 VocabPro Email Sender Module
-Sends daily vocabulary via Brevo SMTP (free tier: 300 emails/day)
+Sends daily vocabulary via Brevo API (HTTPS, works on Render free tier)
 """
 
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import json
+import urllib.request
+import urllib.error
 
-SMTP_HOST = os.environ.get("BREVO_SMTP_HOST", "smtp-relay.sendinblue.com")
-SMTP_PORT = int(os.environ.get("BREVO_SMTP_PORT", "587"))
-SMTP_LOGIN = os.environ.get("BREVO_SMTP_LOGIN", "")
-SMTP_PASSWORD = os.environ.get("BREVO_SMTP_PASSWORD", "")
-SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", SMTP_LOGIN)
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "")
 SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "VocabPro")
 
 
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an HTML email via Brevo SMTP"""
-    if not SMTP_LOGIN or not SMTP_PASSWORD:
-        print("Email error: SMTP credentials not configured")
+    """Send an HTML email via Brevo API (HTTPS)"""
+    if not BREVO_API_KEY:
+        print("Email error: BREVO_API_KEY not configured")
         return False
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = f"{SENDER_NAME} <{SENDER_EMAIL}>"
-        msg['To'] = to_email
-        msg.attach(MIMEText(html_content, 'html'))
+    if not SENDER_EMAIL:
+        print("Email error: BREVO_SENDER_EMAIL not configured")
+        return False
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_LOGIN, SMTP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-        return True
+    payload = json.dumps({
+        "sender": {"name": SENDER_NAME, "email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=payload,
+        headers={
+            "accept": "application/json",
+            "content-type": "application/json",
+            "api-key": BREVO_API_KEY
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            if resp.status in (200, 201):
+                print(f"Email sent to {to_email}")
+                return True
+            print(f"Email error to {to_email}: HTTP {resp.status}")
+            return False
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="ignore")
+        print(f"Email error to {to_email}: HTTP {e.code} - {body}")
+        return False
     except Exception as e:
         print(f"Email error to {to_email}: {e}")
         return False
