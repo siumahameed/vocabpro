@@ -2944,7 +2944,13 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
     
     50% Bengali -> English (word shown in Bengali, pick English word)
     50% English -> Bengali (word shown in English, pick Bengali meaning)
+    Uses fallback list from whatsapp_bot if database is empty.
     """
+    import json
+    import random
+    import sys
+    import os
+
     conn = get_db_connection()
     if not conn:
         return {"success": False, "error": "Database error"}
@@ -2959,11 +2965,78 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
         words = cursor.fetchall()
         
         if len(words) < question_count:
+            cursor.close()
             conn.close()
-            return {"success": False, "error": f"Not enough vocabulary. Need {question_count}, have {len(words)}"}
-        
-        import json
-        import random
+            # Use fallback vocabulary from whatsapp_bot
+            try:
+                from whatsapp_bot import fallback_vocab_list as fb_list
+                fallback_words = fb_list
+            except ImportError:
+                return {"success": False, "error": f"Not enough vocabulary. Need {question_count}, have {len(words)}"}
+            
+            if len(fallback_words) < question_count:
+                return {"success": False, "error": f"Not enough vocabulary. Need {question_count}, have {len(words)} + {len(fallback_words)}"}
+            
+            half_count = question_count // 2
+            saved = 0
+            conn2 = get_db_connection()
+            if not conn2:
+                return {"success": False, "error": "Database error"}
+            cur2 = conn2.cursor()
+            
+            for i in range(question_count):
+                idx = i % len(fallback_words)
+                item = fallback_words[idx]
+                word = item.get("word", "")
+                meaning_bn = item.get("meaning", item.get("meaning_bn", ""))
+                phonetic = item.get("phonetic", "")
+                
+                if i < half_count:
+                    question_type = "en_to_bn"
+                    correct_answer = meaning_bn
+                    wrong_options = []
+                    for j, fw in enumerate(fallback_words):
+                        if j != idx:
+                            wrong_options.append(fw.get("meaning", fw.get("meaning_bn", "")))
+                        if len(wrong_options) >= 3:
+                            break
+                else:
+                    question_type = "bn_to_en"
+                    correct_answer = word
+                    wrong_options = []
+                    for j, fw in enumerate(fallback_words):
+                        if j != idx:
+                            wrong_options.append(fw.get("word", ""))
+                        if len(wrong_options) >= 3:
+                            break
+                
+                if len(wrong_options) < 3:
+                    continue
+                
+                options = [correct_answer] + wrong_options[:3]
+                random.shuffle(options)
+                
+                try:
+                    if USE_POSTGRES:
+                        cur2.execute("""
+                            INSERT INTO contest_questions
+                            (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (contest_id, i + 1, question_type, None, word, correct_answer, json.dumps(options), phonetic or ""))
+                    else:
+                        cur2.execute("""
+                            INSERT INTO contest_questions
+                            (contest_id, question_number, question_type, word_id, word, correct_answer, options, phonetic)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (contest_id, i + 1, question_type, None, word, correct_answer, json.dumps(options), phonetic or ""))
+                    saved += 1
+                except:
+                    pass
+            
+            conn2.commit()
+            cur2.close()
+            conn2.close()
+            return {"success": True, "generated": saved}
         
         half_count = question_count // 2
         saved = 0
