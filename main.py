@@ -1416,8 +1416,22 @@ async def admin_activate_contest(contest_id: int, _: bool = Depends(require_admi
 @app.get("/api/leaderboard")
 async def get_leaderboard(type: str = "weekly", user: dict = Depends(require_auth)):
     """Get leaderboard rankings"""
-    if type not in ["weekly", "monthly", "streak", "all_time"]:
+    if type not in ["daily", "weekly", "monthly", "streak", "all_time"]:
         type = "weekly"
+
+    if type == "daily":
+        # Daily contest leaderboard
+        contest = database.ensure_daily_contest()
+        if not contest:
+            return {"status": "success", "leaderboard": [], "user_rank": {"rank": 0, "value": 0}, "type": "daily"}
+        leaderboard = database.get_live_leaderboard(contest["id"], limit=100)
+        user_rank_info = database.get_user_contest_rank(user["id"], contest["id"])
+        return {
+            "status": "success",
+            "leaderboard": [{"rank": e["rank"], "user_id": e["user_id"], "name": e["name"], "value": e["score"]} for e in leaderboard],
+            "user_rank": user_rank_info or {"rank": 0, "value": 0},
+            "type": "daily"
+        }
 
     leaderboard = database.get_leaderboard(type, limit=100)
     user_ranks = database.get_user_leaderboard_rank(user["id"])

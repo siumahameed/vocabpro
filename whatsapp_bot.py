@@ -588,6 +588,9 @@ def send_to_all_subscribers(subscribers: list) -> dict:
                     total_words = get_vocabulary_count()
                     new_index = (last_index + 10) % total_words if total_words > 0 else last_index + 10
                     database.update_last_word_index(user_id, new_index)
+                    # Update leaderboard counters
+                    database.increment_leaderboard_words(user_id, 10)
+                    database.update_user_progress(user_id)
                     print(f"✓ Sent to {phone} (word index: {new_index})")
                 else:
                     failed += 1

@@ -399,7 +399,8 @@
             <div class="p-4 sm:p-6">
                 <!-- Leaderboard Tabs -->
                 <div class="flex gap-1.5 sm:gap-2 mb-4 sm:mb-6 overflow-x-auto pb-1">
-                    <button onclick="loadLeaderboard('weekly')" id="lb-weekly" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-orange-100 text-orange-700 transition whitespace-nowrap">Weekly</button>
+                    <button onclick="loadLeaderboard('daily')" id="lb-daily" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-orange-100 text-orange-700 transition whitespace-nowrap">Daily</button>
+                    <button onclick="loadLeaderboard('weekly')" id="lb-weekly" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">Weekly</button>
                     <button onclick="loadLeaderboard('monthly')" id="lb-monthly" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">Monthly</button>
                     <button onclick="loadLeaderboard('streak')" id="lb-streak" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">Streak</button>
                     <button onclick="loadLeaderboard('all_time')" id="lb-all_time" class="lb-tab px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-gray-100 text-gray-600 transition hover:bg-gray-200 whitespace-nowrap">All Time</button>
@@ -1137,16 +1138,17 @@ function renderLeaderboard(leaderboard, userRank, type) {
     const yourRankEl = document.getElementById('your-rank-position');
     const yourValueEl = document.getElementById('your-rank-value');
 
-    const suffix = type === 'weekly' ? 'words' : type === 'monthly' ? 'words' : type === 'streak' ? 'days' : 'words';
-    const label = type === 'weekly' ? 'this week' : type === 'monthly' ? 'this month' : type === 'streak' ? 'day streak' : 'total';
+    const isDaily = type === 'daily';
+    const suffix = isDaily ? 'pts' : type === 'streak' ? 'days' : 'words';
+    const label = isDaily ? 'today' : type === 'weekly' ? 'this week' : type === 'monthly' ? 'this month' : type === 'streak' ? 'day streak' : 'total';
 
     if (userRank) {
-        yourRankEl.textContent = '#' + userRank.rank;
-        yourValueEl.textContent = `${userRank.value} ${suffix} ${label}`;
+        yourRankEl.textContent = '#' + (userRank.rank || 0);
+        yourValueEl.textContent = `${userRank.value || 0} ${suffix} ${label}`;
     }
 
     if (leaderboard.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-gray-400 py-8">No rankings yet. Start learning to climb the leaderboard!</p>';
+        listEl.innerHTML = `<p class="text-center text-gray-400 py-8">${isDaily ? 'No participants yet today. Be the first to take the challenge!' : 'No rankings yet. Start learning to climb the leaderboard!'}</p>`;
         return;
     }
 
@@ -1173,7 +1175,7 @@ function renderLeaderboard(leaderboard, userRank, type) {
 
 // Load leaderboard on page load
 document.addEventListener('DOMContentLoaded', function() {
-    loadLeaderboard('weekly');
+    loadLeaderboard('daily');
 });
 </script>
 {% endblock %}

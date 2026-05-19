@@ -3240,7 +3240,7 @@ def reset_monthly_words_if_needed(user_id: int):
         conn.close()
 
 def increment_leaderboard_words(user_id: int, count: int = 1):
-    """Increment weekly and monthly word counters for a user"""
+    """Increment weekly, monthly, and all-time word counters for a user"""
     reset_weekly_words_if_needed(user_id)
     reset_monthly_words_if_needed(user_id)
     conn = get_db_connection()
@@ -3252,21 +3252,23 @@ def increment_leaderboard_words(user_id: int, count: int = 1):
         if USE_POSTGRES:
             cursor.execute("""
                 UPDATE users SET
+                    words_learned = words_learned + %s,
                     weekly_words_learned = weekly_words_learned + %s,
                     monthly_words_learned = monthly_words_learned + %s,
                     week_start_date = COALESCE(week_start_date, %s),
                     month_start_date = COALESCE(month_start_date, %s)
                 WHERE id = %s
-            """, (count, count, today, today, user_id))
+            """, (count, count, count, today, today, user_id))
         else:
             cursor.execute("""
                 UPDATE users SET
+                    words_learned = words_learned + ?,
                     weekly_words_learned = weekly_words_learned + ?,
                     monthly_words_learned = monthly_words_learned + ?,
                     week_start_date = COALESCE(week_start_date, ?),
                     month_start_date = COALESCE(month_start_date, ?)
                 WHERE id = ?
-            """, (count, count, today, today, user_id))
+            """, (count, count, count, today, today, user_id))
         conn.commit()
     except Exception as e:
         print(f"Error incrementing leaderboard words: {e}")
