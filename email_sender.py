@@ -89,7 +89,7 @@ def create_vocab_email_html(name: str, words: list) -> str:
         <p style="color:#374151; font-size:15px; margin:0 0 20px;">Hi <strong>{name}</strong>, here are your <strong>10 new words</strong> for today!</p>
         {word_cards}
         <div style="text-align:center; margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb;">
-            <a href="https://vocabpro.onrender.com/dashboard" style="display:inline-block; background:#3b82f6; color:#fff; padding:10px 24px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Open Dashboard</a>
+            <a href="https://vocabpro.onrender.com/login" style="display:inline-block; background:#3b82f6; color:#fff; padding:10px 24px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Open Dashboard</a>
         </div>
     </div>
     <p style="text-align:center; color:#9ca3af; font-size:11px; margin-top:12px;">VocabPro &mdash; Learn 10 words every day</p>
@@ -119,7 +119,7 @@ def create_welcome_email_html(name: str) -> str:
             <li>Chat with C_ium, your AI English companion</li>
         </ul>
         <div style="text-align:center; margin-top:24px;">
-            <a href="https://vocabpro.onrender.com/dashboard" style="display:inline-block; background:#3b82f6; color:#fff; padding:10px 24px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Go to Dashboard</a>
+            <a href="https://vocabpro.onrender.com/login" style="display:inline-block; background:#3b82f6; color:#fff; padding:10px 24px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px;">Go to Dashboard</a>
         </div>
     </div>
     <p style="text-align:center; color:#9ca3af; font-size:11px; margin-top:12px;">VocabPro &mdash; Learn 10 words every day</p>
