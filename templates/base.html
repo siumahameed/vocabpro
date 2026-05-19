@@ -393,10 +393,15 @@
         @media (max-width: 640px) {
             .cw-window, .cw-window-prompt {
                 bottom: 0; right: 0; left: 0;
-                width: 100%; height: 100%;
-                border-radius: 0;
+                width: 100%;
+                height: 75vh;
+                border-radius: 20px 20px 0 0;
+                max-height: 75vh;
             }
             .chat-fab { bottom: 16px; right: 16px; }
+            .chat-fab.cw-fab-hidden { display: none !important; }
+            #cwMessages { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+            .cw-input-bar { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
         }
     </style>
     
@@ -640,9 +645,11 @@
             const isOpen = loginPrompt.classList.contains('cw-open');
             if (isOpen) {
                 loginPrompt.classList.remove('cw-open');
+                fab.classList.remove('cw-fab-hidden');
                 fab.innerHTML = CW_FAB_CLOSED;
             } else {
                 loginPrompt.classList.add('cw-open');
+                fab.classList.add('cw-fab-hidden');
                 fab.innerHTML = CW_FAB_OPEN;
             }
             return;
@@ -652,9 +659,11 @@
         const isOpen = widget.classList.contains('cw-open');
         if (isOpen) {
             widget.classList.remove('cw-open');
+            fab.classList.remove('cw-fab-hidden');
             fab.innerHTML = CW_FAB_CLOSED;
         } else {
             widget.classList.add('cw-open');
+            fab.classList.add('cw-fab-hidden');
             fab.innerHTML = CW_FAB_OPEN;
             if (!cwLoaded) { cwLoadHistory(); cwLoaded = true; }
             setTimeout(() => document.getElementById('cwChatInput').focus(), 300);
@@ -803,6 +812,27 @@
         } catch (e) {
             console.error('Clear chat error:', e);
         }
+    }
+
+    // Mobile keyboard handling — keep messages visible when keyboard opens
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const widget = document.getElementById('chatWidget');
+            if (widget && widget.classList.contains('cw-open')) {
+                const vh = window.visualViewport.height;
+                const fullVh = window.innerHeight;
+                if (vh < fullVh * 0.8) {
+                    // Keyboard is open — shrink to fit
+                    widget.style.height = vh + 'px';
+                    widget.style.maxHeight = vh + 'px';
+                } else {
+                    // Keyboard closed — reset
+                    widget.style.height = '';
+                    widget.style.maxHeight = '';
+                }
+                cwScrollToBottom();
+            }
+        });
     }
     </script>
     {% endif %}

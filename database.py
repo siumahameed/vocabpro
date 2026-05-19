@@ -2112,7 +2112,8 @@ def get_learned_words(user_id: int, category: str = None, count: int = 10, use_u
                 FROM vocabulary ORDER BY RANDOM() LIMIT ?
             """, (count,))
 
-    words = [dict(w) for w in cursor.fetchall()]
+    rows = cursor.fetchall()
+    words = _rows_to_dicts(cursor, rows)
     cursor.close()
     conn.close()
     return words
