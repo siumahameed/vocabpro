@@ -3169,11 +3169,10 @@ def get_top_5_winners(contest_id: int) -> list:
 
 
 def generate_contest_questions(contest_id: int, question_count: int = 25) -> dict:
-    """Generate mixed Bengali-English questions for a contest
-    
-    50% Bengali -> English (word shown in Bengali, pick English word)
-    50% English -> Bengali (word shown in English, pick Bengali meaning)
-    Uses fallback list from whatsapp_bot if database is empty.
+    """Generate mixed Bengali-English questions for a contest.
+
+    Distribution: ~60% from most popular user category, ~40% from others.
+    Types: 50% en_to_bn, 50% bn_to_en.
     """
     import json
     import random
@@ -3183,43 +3182,77 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
     conn = get_db_connection()
     if not conn:
         return {"success": False, "error": "Database error"}
-    
+
     cursor = conn.cursor()
-    
+
     try:
+        # Step 1: Determine category distribution based on user preferences
+        try:
+            if USE_POSTGRES:
+                cursor.execute("SELECT preferred_category, COUNT(*) as cnt FROM users WHERE preferred_category IS NOT NULL GROUP BY preferred_category ORDER BY cnt DESC")
+            else:
+                cursor.execute("SELECT preferred_category, COUNT(*) as cnt FROM users WHERE preferred_category IS NOT NULL GROUP BY preferred_category ORDER BY cnt DESC")
+            cat_rows = cursor.fetchall()
+            cat_dist = {}
+            for row in cat_rows:
+                cat_dist[row[0]] = row[1]
+        except Exception:
+            cat_dist = {"ielts": 1}
+
+        # Calculate word counts per category
+        primary_cat = max(cat_dist, key=cat_dist.get) if cat_dist else "ielts"
+        primary_count = int(question_count * 0.6)
+        remaining_count = question_count - primary_count
+
+        # Step 2: Fetch words — primary category first
+        words = []
         if USE_POSTGRES:
-            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (question_count,))
+            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE LOWER(%s) ORDER BY RANDOM() LIMIT %s", (f"%{primary_cat}%", primary_count))
         else:
-            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (question_count,))
-        words = cursor.fetchall()
-        
+            cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE LOWER(?) ORDER BY RANDOM() LIMIT ?", (f"%{primary_cat}%", primary_count))
+        words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
+
+        # Fetch remaining from other categories
+        seen_ids = {w[0] for w in words}
+        if remaining_count > 0:
+            if USE_POSTGRES:
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (remaining_count * 3,))
+            else:
+                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT ?", (remaining_count * 3,))
+            for w in cursor.fetchall():
+                if w[0] not in seen_ids:
+                    words.append((w[0], w[1], w[2], w[3]))
+                    seen_ids.add(w[0])
+                if len(words) >= question_count:
+                    break
+
+        # Fallback if not enough words
         if len(words) < question_count:
             cursor.close()
             conn.close()
-            # Use fallback vocabulary from whatsapp_bot
             try:
                 from whatsapp_bot import fallback_vocab_list as fb_list
                 fallback_words = fb_list
             except ImportError:
                 return {"success": False, "error": f"Not enough vocabulary. Need {question_count}, have {len(words)}"}
-            
+
             if len(fallback_words) < question_count:
                 return {"success": False, "error": f"Not enough vocabulary. Need {question_count}, have {len(words)} + {len(fallback_words)}"}
-            
+
             half_count = question_count // 2
             saved = 0
             conn2 = get_db_connection()
             if not conn2:
                 return {"success": False, "error": "Database error"}
             cur2 = conn2.cursor()
-            
+
             for i in range(question_count):
                 idx = i % len(fallback_words)
                 item = fallback_words[idx]
                 word = item.get("word", "")
                 meaning_bn = item.get("meaning", item.get("meaning_bn", ""))
                 phonetic = item.get("phonetic", "")
-                
+
                 if i < half_count:
                     question_type = "en_to_bn"
                     correct_answer = meaning_bn
@@ -3238,13 +3271,13 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
                             wrong_options.append(fw.get("word", ""))
                         if len(wrong_options) >= 3:
                             break
-                
+
                 if len(wrong_options) < 3:
                     continue
-                
+
                 options = [correct_answer] + wrong_options[:3]
                 random.shuffle(options)
-                
+
                 try:
                     if USE_POSTGRES:
                         cur2.execute("""
@@ -3261,12 +3294,12 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
                     saved += 1
                 except:
                     pass
-            
+
             conn2.commit()
             cur2.close()
             conn2.close()
             return {"success": True, "generated": saved}
-        
+
         half_count = question_count // 2
         saved = 0
         

@@ -105,7 +105,7 @@
                 </div>
                 <div class="ml-3">
                     <p class="text-sm text-green-700">
-                        <strong>Pro Member!</strong> Your subscription is active. Daily words at 9:30 AM.
+                        <strong>Pro Member!</strong> Your subscription is active. Daily words at {{ user.preferred_time }}.
                     </p>
                 </div>
             </div>
@@ -179,7 +179,7 @@
             <div class="stat-card bg-white rounded-xl shadow-sm p-3 sm:p-5 border border-gray-100">
                 <div class="flex items-center">
                     <div class="w-9 h-9 sm:w-11 sm:h-11 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span class="text-lg sm:text-xl">{% if user.delivery_channel == 'email' %}📧{% elif user.delivery_channel == 'whatsapp' %}💬{% else %}📬{% endif %}</span>
+                        <span class="text-lg sm:text-xl">📧</span>
                     </div>
                     <div class="ml-2.5 sm:ml-3 min-w-0">
                         <p class="text-xs sm:text-sm text-gray-500">Delivery</p>
@@ -196,7 +196,7 @@
                     </div>
                     <div class="ml-2.5 sm:ml-3 min-w-0">
                         <p class="text-xs sm:text-sm text-gray-500">Next Words</p>
-                        <p class="text-base sm:text-lg font-bold text-orange-600">9:30 AM</p>
+                        <p class="text-base sm:text-lg font-bold text-orange-600">{{ user.preferred_time }}</p>
                     </div>
                 </div>
             </div>
@@ -277,7 +277,7 @@
                             <span class="text-xl sm:text-2xl">⚡</span>
                             <h3 class="text-base sm:text-xl font-bold truncate" id="weekly-contest-name">Weekly Challenge</h3>
                         </div>
-                        <p class="text-orange-200 text-xs sm:text-sm" id="weekly-contest-desc">50 questions, 9s per question</p>
+                        <p class="text-orange-200 text-xs sm:text-sm" id="weekly-contest-desc">Loading...</p>
                     </div>
                     <span id="weekly-status-badge" class="px-2.5 py-1 bg-white/20 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0">
                         Loading...
@@ -286,12 +286,12 @@
 
                 <div class="flex items-center gap-4 mb-3">
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl font-bold">50</p>
+                        <p class="text-2xl sm:text-3xl font-bold" id="weekly-q-count">50</p>
                         <p class="text-xs text-orange-200">Questions</p>
                     </div>
                     <div class="w-px h-8 bg-white/30"></div>
                     <div class="text-center">
-                        <p class="text-2xl sm:text-3xl font-bold">9s</p>
+                        <p class="text-2xl sm:text-3xl font-bold" id="weekly-time-per-q">15s</p>
                         <p class="text-xs text-orange-200">Per Q</p>
                     </div>
                     <div class="w-px h-8 bg-white/30"></div>
@@ -417,7 +417,7 @@
                             <option value="common" {% if user.preferred_category == 'common' %}selected{% endif %}>Common Words</option>
                         </select>
                         <button id="saveCategoryBtn" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md active:scale-95">
-                            Request
+                            Request Change
                         </button>
                     </div>
                     <div id="categoryMessage" class="hidden text-center p-2 rounded-lg text-xs mt-2"></div>
@@ -829,7 +829,7 @@ async function loadContestData() {
 
             document.getElementById('contest-name').textContent = contest.name;
             document.getElementById('contest-questions').textContent = contest.question_count;
-            document.getElementById('contest-dates').textContent = 'Answer 25 questions, compete with others!';
+            document.getElementById('contest-dates').textContent = 'Answer ' + contest.question_count + ' questions, compete with others!';
 
             const participateBtn = document.getElementById('contest-participate-btn');
 
@@ -866,9 +866,20 @@ async function loadContestData() {
                 }).join('');
                 document.getElementById('contest-live-lb').classList.remove('hidden');
             }
+        } else {
+            // No contest available — update button
+            const participateBtn = document.getElementById('contest-participate-btn');
+            participateBtn.textContent = 'No Active Challenge';
+            participateBtn.className = 'block w-full text-center px-4 py-2.5 bg-white/20 text-white rounded-xl text-sm font-medium cursor-not-allowed';
+            participateBtn.href = '#';
+            participateBtn.onclick = function(e) { e.preventDefault(); };
+            document.getElementById('contest-dates').textContent = 'Check back tomorrow!';
         }
     } catch (error) {
         console.log('Error loading contest:', error);
+        const participateBtn = document.getElementById('contest-participate-btn');
+        participateBtn.textContent = 'Tap to Retry';
+        participateBtn.onclick = function(e) { e.preventDefault(); loadContestData(); };
     }
 }
 
@@ -885,6 +896,9 @@ async function loadWeeklyContestData() {
             weeklyContestId = contest.id;
 
             document.getElementById('weekly-contest-name').textContent = contest.name;
+            document.getElementById('weekly-contest-desc').textContent = contest.question_count + ' questions, ' + (contest.time_per_question_seconds || 15) + 's per question';
+            document.getElementById('weekly-q-count').textContent = contest.question_count || 50;
+            document.getElementById('weekly-time-per-q').textContent = (contest.time_per_question_seconds || 15) + 's';
 
             const btn = document.getElementById('weekly-participate-btn');
             const badge = document.getElementById('weekly-status-badge');
@@ -1006,20 +1020,27 @@ function setQuizBtnLoading(type, loading) {
 async function startQuiz(type) {
     quizType = type || 'bengali';
     setQuizBtnLoading(quizType, true);
+    // Show modal immediately with loading state
+    closeQuizTypeModal();
+    document.getElementById('quizResults').classList.add('hidden');
+    document.getElementById('quizNewUserPrompt').classList.add('hidden');
+    document.getElementById('quizBody').classList.remove('hidden');
+    document.getElementById('quizWord').textContent = 'Loading...';
+    document.getElementById('quizPhonetic').textContent = '';
+    document.getElementById('quizOptions').innerHTML = '';
+    document.getElementById('quizModal').classList.remove('hidden');
+
     try {
         const resp = await fetch('/api/quiz/start?type=' + quizType + '&source=' + quizSource);
         const data = await resp.json();
-        closeQuizTypeModal();
         if (data.status !== 'success') {
             setQuizBtnLoading(quizType, false);
-            // New user friendly prompt
             if (quizSource === 'learned' && data.message && data.message.includes('Not enough')) {
                 document.getElementById('quizBody').classList.add('hidden');
-                document.getElementById('quizResults').classList.add('hidden');
                 document.getElementById('quizNewUserPrompt').classList.remove('hidden');
-                document.getElementById('quizModal').classList.remove('hidden');
                 return;
             }
+            document.getElementById('quizModal').classList.add('hidden');
             alert(data.message || 'Could not start quiz');
             return;
         }
@@ -1029,13 +1050,9 @@ async function startQuiz(type) {
         questionChances = 0;
         document.getElementById('quizTotal').textContent = quizQuestions.length;
         document.getElementById('quizScore').textContent = '0';
-        document.getElementById('quizResults').classList.add('hidden');
-        document.getElementById('quizNewUserPrompt').classList.add('hidden');
-        document.getElementById('quizBody').classList.remove('hidden');
         showQuestion();
-        document.getElementById('quizModal').classList.remove('hidden');
     } catch (e) {
-        closeQuizTypeModal();
+        document.getElementById('quizModal').classList.add('hidden');
         alert('Error starting quiz');
     } finally {
         setQuizBtnLoading(quizType, false);

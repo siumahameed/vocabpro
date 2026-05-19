@@ -106,7 +106,14 @@
         const submitBtn = document.getElementById('submitBtn');
         const loadingIcon = document.getElementById('loadingIcon');
         const rememberCheckbox = document.getElementById('remember');
-        
+
+        // Pre-fill email from localStorage
+        const savedEmail = localStorage.getItem('vocabpro_email');
+        if (savedEmail) {
+            emailInput.value = savedEmail;
+            rememberCheckbox.checked = true;
+        }
+
         function validateEmail(email) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         }
@@ -150,10 +157,8 @@
             
             if (remember) {
                 localStorage.setItem('vocabpro_email', email);
-                localStorage.setItem('vocabpro_password', password);
             } else {
                 localStorage.removeItem('vocabpro_email');
-                localStorage.removeItem('vocabpro_password');
             }
             
             submitBtn.disabled = true;
@@ -170,7 +175,7 @@
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    window.location.href = '/dashboard';
+                    window.location.href = data.redirect || '/dashboard';
                 } else {
                     showError(formError, data.message || 'Invalid email or password');
                     formError.classList.remove('hidden');

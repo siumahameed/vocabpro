@@ -206,3 +206,27 @@ def send_to_email_subscribers(subscribers: list) -> dict:
 
     print(f"Email broadcast complete: {sent} sent, {failed} failed")
     return {"sent": sent, "failed": failed, "total": total}
+
+
+def send_broadcast_email(user: dict, message: str) -> bool:
+    """Send a broadcast message to a single user via email"""
+    name = user.get('name', 'Learner')
+    email = user.get('email', '')
+    if not email:
+        return False
+    subject = "VocabPro - Important Update"
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f0f4f8;">
+<div style="max-width:580px;margin:20px auto;font-family:'Segoe UI',Arial,sans-serif;">
+    <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px 16px 0 0;padding:28px 32px;text-align:center;">
+        <h1 style="color:#fff;margin:0;font-size:24px;">VocabPro</h1>
+    </div>
+    <div style="background:#fff;padding:28px 32px;border-radius:0 0 16px 16px;">
+        <p style="color:#374151;font-size:15px;">Hi {name},</p>
+        <p style="color:#374151;font-size:15px;line-height:1.6;">{message}</p>
+        <p style="color:#6b7280;font-size:13px;margin-top:24px;">— The VocabPro Team</p>
+    </div>
+</div>
+</body></html>"""
+    return send_email(email, subject, html)

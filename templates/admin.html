@@ -678,14 +678,14 @@ function renderUsersTable(users) {
     const tbody = document.getElementById('usersTableBody');
     tbody.innerHTML = users.map(u => `
         <tr>
-            <td><input type="checkbox" class="user-checkbox" value="${u.id}" onchange="updateBulkActions()"></td>
-            <td>${u.id}</td>
+            <td class="hidden sm:table-cell"><input type="checkbox" class="user-checkbox" value="${u.id}" onchange="updateBulkActions()"></td>
+            <td class="hidden md:table-cell">${u.id}</td>
             <td>${u.name}</td>
-            <td>${u.email}</td>
-            <td>${(u.delivery_channel || 'email').charAt(0).toUpperCase() + (u.delivery_channel || 'email').slice(1)}</td>
+            <td class="hidden md:table-cell">${u.email}</td>
+            <td class="hidden lg:table-cell capitalize">${u.delivery_channel || 'email'}</td>
             <td><span class="status-badge ${u.is_paid ? 'status-paid' : 'status-trial'}">${u.is_paid ? 'Paid' : 'Trial'}</span></td>
-            <td>${u.streak_days || 0} days</td>
-            <td>${(u.created_at || '').slice(0, 10)}</td>
+            <td class="hidden md:table-cell">${u.streak_days || 0} days</td>
+            <td class="hidden lg:table-cell">${(u.created_at || '').slice(0, 10)}</td>
             <td class="flex gap-2">
                 <button onclick="viewUser(${u.id})" class="text-blue-600 hover:text-blue-800 text-sm">View</button>
                 <button onclick="toggleSubscription(${u.id})" class="text-sm ${u.is_paid ? 'text-red-600' : 'text-green-600'}">${u.is_paid ? 'Deactivate' : 'Activate'}</button>

@@ -84,7 +84,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     session_cookie="vocabpro_session",
-    https_only=True,
+    https_only=os.environ.get("SESSION_HTTPS_ONLY", "false").lower() == "true",
     same_site="lax"
 )
 
@@ -241,16 +241,6 @@ async def update_profile(data: dict, user: dict = Depends(require_auth)):
         database.update_delivery_channel(user["id"], delivery_channel)
         return {"status": "success", "message": "Profile updated successfully!"}
     return {"status": "error", "message": "Failed to update profile"}
-
-@app.post("/api/update-delivery-channel")
-async def update_delivery_channel(data: dict, user: dict = Depends(require_auth)):
-    """Update user's delivery channel preference"""
-    channel = data.get("channel", "email")
-    if channel not in ["email", "whatsapp", "both"]:
-        return {"status": "error", "message": "Invalid channel. Use email, whatsapp, or both."}
-    if database.update_delivery_channel(user["id"], channel):
-        return {"status": "success", "message": f"Delivery channel updated to {channel}"}
-    return {"status": "error", "message": "Failed to update delivery channel"}
 
 @app.post("/api/profile/change-password")
 async def change_password(data: dict, user: dict = Depends(require_auth)):
@@ -510,22 +500,6 @@ async def submit_payment(payment: PaymentSubmit, user: dict = Depends(require_au
         "message": "Payment submitted for verification. You'll be notified once verified (usually within 24 hours)."
     }
 
-@app.post("/api/get-words")
-async def get_words_now(user: dict = Depends(require_auth)):
-    """Send vocabulary words immediately"""
-    if not user.get("is_subscribed"):
-        return {"status": "error", "message": "Subscribe to get words"}
-    
-    user_category = user.get("preferred_category", "ielts")
-    words = whatsapp_bot.get_daily_words(category=user_category)
-    message = whatsapp_bot.create_vocabulary_message(words)
-    
-    success = whatsapp_bot.send_whatsapp_message(user["whatsapp_number"], message)
-    
-    if success:
-        return {"status": "success", "message": "Words sent to your WhatsApp!"}
-    return {"status": "error", "message": "Failed to send words. Please try again."}
-
 @app.post("/api/update-time")
 async def update_preferred_time(data: TimeUpdate, user: dict = Depends(require_auth)):
     """Update user's preferred message time"""
@@ -693,23 +667,24 @@ async def toggle_subscription(data: dict, _: bool = Depends(require_admin_sessio
 
 @app.post("/api/admin/broadcast")
 async def broadcast(data: dict, _: bool = Depends(require_admin_session)):
-    """Send message to all users"""
+    """Send message to all users via email"""
     message = data.get("message")
     if not message:
         return {"status": "error", "message": "Message required"}
-    
-    # Get all active users
+
     users = database.get_all_subscribers()
-    
+
     sent = 0
     failed = 0
-    
+
     for user in users:
-        if whatsapp_bot.send_whatsapp_message(user["whatsapp_number"], message):
+        try:
+            email_sender.send_broadcast_email(user, message)
             sent += 1
-        else:
+        except Exception as e:
+            print(f"Broadcast email failed for {user.get('email')}: {e}")
             failed += 1
-    
+
     return {"status": "success", "message": f"Sent to {sent} users", "sent": sent, "failed": failed}
 
 @app.post("/api/admin/generate-vocabulary")
@@ -1180,6 +1155,16 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
     contest = database.get_contest_by_id(contest_id)
     if not contest:
         return {"status": "error", "message": "Contest not found"}
+
+    # Validate contest is currently active
+    import datetime as _dt
+    now = _dt.datetime.now()
+    start_time = _dt.datetime.fromisoformat(contest["start_time"])
+    end_time = _dt.datetime.fromisoformat(contest["end_time"])
+    if now < start_time:
+        return {"status": "error", "message": "This contest hasn't started yet"}
+    if now > end_time:
+        return {"status": "error", "message": "This contest has ended"}
 
     existing = database.check_user_participation(user["id"], contest_id)
     if existing:
