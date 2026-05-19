@@ -897,9 +897,13 @@ async function loadWeeklyContestData() {
                 btn.href = '/contest/' + contest.id;
                 btn.className = 'block w-full text-center px-4 py-2.5 bg-white text-orange-700 rounded-xl text-sm font-bold hover:bg-orange-50 transition shadow-lg';
             }
+        } else {
+            // Not Friday or no contest - hide widget
+            document.getElementById('weekly-contest-widget').classList.add('hidden');
         }
     } catch (error) {
         console.log('Error loading weekly contest:', error);
+        document.getElementById('weekly-contest-widget').classList.add('hidden');
     }
 }
 

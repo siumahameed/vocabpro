@@ -383,18 +383,20 @@ def get_user_by_email(email: str) -> Optional[dict]:
     conn = get_db_connection()
     if not conn:
         return None
-    
+
     cursor = conn.cursor()
-    
+
     if USE_POSTGRES:
         cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
     else:
         cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-    
+
     user = cursor.fetchone()
+    result = _row_to_dict(cursor, user)
+    cursor.close()
     conn.close()
 
-    return _row_to_dict(cursor, user)
+    return result
 
 def get_all_users() -> list:
     conn = get_db_connection()
@@ -2445,17 +2447,19 @@ def get_contest_by_id(contest_id: int) -> Optional[dict]:
     conn = get_db_connection()
     if not conn:
         return None
-    
+
     cursor = conn.cursor()
     if USE_POSTGRES:
         cursor.execute("SELECT * FROM quiz_contests WHERE id = %s", (contest_id,))
     else:
         cursor.execute("SELECT * FROM quiz_contests WHERE id = ?", (contest_id,))
-    
+
     contest = cursor.fetchone()
+    result = _row_to_dict(cursor, contest)
+    cursor.close()
     conn.close()
-    
-    return _row_to_dict(cursor, contest)
+
+    return result
 
 
 def get_completed_contest() -> Optional[dict]:
@@ -2543,7 +2547,7 @@ def get_contest_questions(contest_id: int) -> list:
     conn = get_db_connection()
     if not conn:
         return []
-    
+
     cursor = conn.cursor()
 
     if USE_POSTGRES:
@@ -2560,7 +2564,6 @@ def get_contest_questions(contest_id: int) -> list:
         """, (contest_id,))
 
     questions = cursor.fetchall()
-    conn.close()
 
     import json
     result = []
@@ -2569,6 +2572,8 @@ def get_contest_questions(contest_id: int) -> list:
         q_dict['options'] = json.loads(q_dict['options'])
         result.append(q_dict)
 
+    cursor.close()
+    conn.close()
     return result
 
 
@@ -2577,7 +2582,7 @@ def shuffle_contest_questions(contest_id: int) -> list:
     conn = get_db_connection()
     if not conn:
         return []
-    
+
     cursor = conn.cursor()
 
     if USE_POSTGRES:
@@ -2594,7 +2599,6 @@ def shuffle_contest_questions(contest_id: int) -> list:
         """, (contest_id,))
 
     questions = cursor.fetchall()
-    conn.close()
 
     import json
     result = []
@@ -2603,6 +2607,8 @@ def shuffle_contest_questions(contest_id: int) -> list:
         q_dict['options'] = json.loads(q_dict['options'])
         result.append(q_dict)
 
+    cursor.close()
+    conn.close()
     return result
 
 
@@ -3127,13 +3133,16 @@ def ensure_daily_contest() -> Optional[dict]:
 
 
 def ensure_weekly_contest() -> Optional[dict]:
-    """Ensure this week's Friday contest exists. Create if not. Returns contest dict."""
+    """Ensure this week's Friday contest exists. Only returns contest on Fridays."""
     import datetime
 
     today = datetime.date.today()
-    # Find the most recent Friday (including today if Friday)
-    days_since_friday = (today.weekday() - 4) % 7
-    friday = today - datetime.timedelta(days=days_since_friday)
+
+    # Only available on Fridays (weekday 4)
+    if today.weekday() != 4:
+        return None
+
+    friday = today
     friday_str = friday.isoformat()
 
     conn = get_db_connection()
@@ -3142,7 +3151,7 @@ def ensure_weekly_contest() -> Optional[dict]:
 
     cursor = conn.cursor()
 
-    # Check if this week's contest already exists
+    # Check if today's contest already exists
     if USE_POSTGRES:
         cursor.execute("""
             SELECT id, name, question_count, status, time_per_question_seconds FROM quiz_contests
