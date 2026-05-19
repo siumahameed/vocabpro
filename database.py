@@ -812,22 +812,6 @@ def update_user_subscription(user_id: int, is_paid: bool = True):
     cursor.close()
     conn.close()
 
-def delete_user(user_id: int):
-    conn = get_db_connection()
-    if not conn:
-        return
-    
-    cursor = conn.cursor()
-    
-    if USE_POSTGRES:
-        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
-    else:
-        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
-
 def create_payment(user_id: int, amount: int, transaction_id: str) -> Optional[int]:
     conn = get_db_connection()
     if not conn:
@@ -1683,7 +1667,7 @@ def search_users(query: str = "", status: str = "all") -> list:
 
 
 def delete_user(user_id: int) -> bool:
-    """Delete a user"""
+    """Delete a user and all related data"""
     conn = get_db_connection()
     if not conn:
         return False
@@ -1693,14 +1677,31 @@ def delete_user(user_id: int) -> bool:
     try:
         if USE_POSTGRES:
             cursor.execute("DELETE FROM payments WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM user_word_progress WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM quiz_attempts WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM quiz_contest_participation WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM user_achievements WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM chat_messages WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM user_activity WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM vocab_requests WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM category_change_requests WHERE user_id = %s", (user_id,))
             cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
         else:
             cursor.execute("DELETE FROM payments WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM user_word_progress WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM quiz_attempts WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM quiz_contest_participation WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM user_achievements WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM user_activity WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM vocab_requests WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM category_change_requests WHERE user_id = ?", (user_id,))
             cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
         return True
     except Exception as e:
         print(f"Error deleting user: {e}")
+        conn.rollback()
         return False
     finally:
         cursor.close()
