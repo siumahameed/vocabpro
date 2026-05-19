@@ -197,7 +197,7 @@ async function loadQuiz() {
         }
         
         questions = data.questions;
-        timerSeconds = data.time_remaining_seconds;
+        timerSeconds = data.time_limit_seconds || 1800;
         endTime = new Date(Date.now() + timerSeconds * 1000);
         startTime = Date.now();
         

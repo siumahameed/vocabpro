@@ -2620,13 +2620,13 @@ def check_user_participation(user_id: int, contest_id: int) -> Optional[dict]:
 
 
 def save_contest_participation(user_id: int, contest_id: int, score: int, correct_count: int, wrong_count: int, skipped_count: int, time_taken_seconds: int, submitted_at: str) -> bool:
-    """Save user's contest participation"""
+    """Save user's contest participation and auto-rank"""
     conn = get_db_connection()
     if not conn:
         return False
-    
+
     cursor = conn.cursor()
-    
+
     try:
         if USE_POSTGRES:
             cursor.execute("""
@@ -2648,12 +2648,14 @@ def save_contest_participation(user_id: int, contest_id: int, score: int, correc
             cursor.execute("""
                 UPDATE users SET total_contests_participated = total_contests_participated + 1 WHERE id = ?
             """, (user_id,))
-        
+
         conn.commit()
-        success = cursor.rowcount > 0
         cursor.close()
         conn.close()
-        return success
+
+        # Auto-rank after saving
+        calculate_and_save_ranks(contest_id)
+        return True
     except Exception as e:
         print(f"Error saving participation: {e}")
         cursor.close()
@@ -3023,22 +3025,22 @@ def generate_contest_questions(contest_id: int, question_count: int = 25) -> dic
 def check_and_create_weekly_contest() -> Optional[int]:
     """Check if weekly contest needs to be created and create it"""
     import datetime
-    
+
     today = datetime.datetime.now()
     weekday = today.weekday()
-    
+
     friday = today + datetime.timedelta(days=(4 - weekday) % 7)
     friday = friday.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     saturday = friday + datetime.timedelta(days=1, hours=23, minutes=59, seconds=59)
     reveal_time = friday + datetime.timedelta(days=1)
-    
+
     contest_name = f"Weekly Challenge #{today.isocalendar()[1]}"
-    
+
     existing = get_current_contest()
     if existing:
         return existing["id"]
-    
+
     contest_id = create_contest(
         name=contest_name,
         week_number=today.isocalendar()[1],
@@ -3048,9 +3050,116 @@ def check_and_create_weekly_contest() -> Optional[int]:
         reveal_time=reveal_time.isoformat(),
         question_count=25
     )
-    
+
     if contest_id:
         generate_contest_questions(contest_id, 25)
+
+
+def ensure_daily_contest() -> Optional[dict]:
+    """Ensure today's daily contest exists. Create if not. Returns contest dict."""
+    import datetime
+
+    today = datetime.date.today()
+    today_str = today.isoformat()
+
+    conn = get_db_connection()
+    if not conn:
+        return None
+
+    cursor = conn.cursor()
+
+    # Check if today's contest already exists
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT id, name, question_count, status FROM quiz_contests
+            WHERE DATE(start_time) = %s AND name LIKE 'Daily%%'
+            LIMIT 1
+        """, (today_str,))
+    else:
+        cursor.execute("""
+            SELECT id, name, question_count, status FROM quiz_contests
+            WHERE DATE(start_time) = ? AND name LIKE 'Daily%%'
+            LIMIT 1
+        """, (today_str,))
+
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if row:
+        return {"id": row[0], "name": row[1], "question_count": row[2], "status": row[3]}
+
+    # Create today's contest
+    start_time = datetime.datetime.combine(today, datetime.time.min).isoformat()
+    end_time = datetime.datetime.combine(today, datetime.time.max).isoformat()
+    reveal_time = end_time
+    contest_name = f"Daily Challenge - {today.strftime('%b %d, %Y')}"
+
+    contest_id = create_contest(
+        name=contest_name,
+        week_number=today.isocalendar()[1],
+        year=today.year,
+        start_time=start_time,
+        end_time=end_time,
+        reveal_time=reveal_time,
+        question_count=25
+    )
+
+    if contest_id:
+        generate_contest_questions(contest_id, 25)
+        # Activate immediately
+        update_contest_status(contest_id, 'active')
+        return {"id": contest_id, "name": contest_name, "question_count": 25, "status": "active"}
+
+    return None
+
+
+def get_live_leaderboard(contest_id: int, limit: int = 10) -> list:
+    """Get live leaderboard with on-the-fly ranking (no stored rank dependency)"""
+    conn = get_db_connection()
+    if not conn:
+        return []
+
+    cursor = conn.cursor()
+
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT qp.user_id, u.name, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds
+            FROM quiz_participations qp
+            JOIN users u ON qp.user_id = u.id
+            WHERE qp.contest_id = %s
+            ORDER BY qp.score DESC, qp.time_taken_seconds ASC
+            LIMIT %s
+        """, (contest_id, limit))
+    else:
+        cursor.execute("""
+            SELECT qp.user_id, u.name, qp.score, qp.correct_count, qp.wrong_count, qp.time_taken_seconds
+            FROM quiz_participations qp
+            JOIN users u ON qp.user_id = u.id
+            WHERE qp.contest_id = ?
+            ORDER BY qp.score DESC, qp.time_taken_seconds ASC
+            LIMIT ?
+        """, (contest_id, limit))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    leaderboard = []
+    for rank, row in enumerate(rows, 1):
+        minutes = row[5] // 60
+        seconds = row[5] % 60
+        leaderboard.append({
+            "rank": rank,
+            "user_id": row[0],
+            "name": row[1],
+            "score": row[2],
+            "correct": row[3],
+            "wrong": row[4],
+            "time_seconds": row[5],
+            "time_display": f"{minutes}m {seconds}s"
+        })
+
+    return leaderboard
 
 
 # ==================== LEADERBOARD FUNCTIONS ====================

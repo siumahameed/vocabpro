@@ -1083,42 +1083,51 @@ async def admin_analytics(_: bool = Depends(require_admin_session)):
 # ==================== WEEKLY QUIZ CONTEST ENDPOINTS ====================
 
 @app.get("/api/contests/current")
-async def get_current_contest_info():
-    """Get current or upcoming contest"""
-    contest = database.get_current_contest()
+async def get_current_contest_info(request: Request):
+    """Get today's daily contest (auto-creates if needed) with live leaderboard"""
+    contest = database.ensure_daily_contest()
     if not contest:
         return {"status": "success", "contest": None, "message": "No active contest"}
-    
-    import datetime
-    now = datetime.datetime.now()
-    start_time = datetime.datetime.fromisoformat(contest["start_time"])
-    end_time = datetime.datetime.fromisoformat(contest["end_time"])
-    reveal_time = datetime.datetime.fromisoformat(contest["reveal_time"])
-    
-    if now < start_time:
-        status = "upcoming"
-        time_remaining = (start_time - now).total_seconds()
-    elif now < end_time:
-        status = "active"
-        time_remaining = (end_time - now).total_seconds()
-    else:
-        status = "completed"
-        time_remaining = 0
-    
+
+    leaderboard = database.get_live_leaderboard(contest["id"], limit=5)
+
+    # Check if current user has participated
+    user_id = request.session.get("user_id")
+    user_participated = False
+    user_rank_info = None
+    if user_id:
+        participation = database.check_user_participation(user_id, contest["id"])
+        if participation:
+            user_participated = True
+            user_rank_info = database.get_user_contest_rank(user_id, contest["id"])
+
     return {
         "status": "success",
         "contest": {
             "id": contest["id"],
             "name": contest["name"],
-            "week": contest["week_number"],
-            "year": contest["year"],
-            "start_time": contest["start_time"],
-            "end_time": contest["end_time"],
-            "reveal_time": contest["reveal_time"],
             "question_count": contest["question_count"],
-            "status": status,
-            "time_remaining_seconds": int(time_remaining) if time_remaining > 0 else 0
-        }
+            "status": "active",
+            "user_participated": user_participated,
+            "user_rank": user_rank_info
+        },
+        "leaderboard": leaderboard
+    }
+
+
+@app.get("/api/contests/today-leaderboard")
+async def get_today_leaderboard():
+    """Get live leaderboard for today's contest (no auth required)"""
+    contest = database.ensure_daily_contest()
+    if not contest:
+        return {"status": "success", "leaderboard": [], "contest": None}
+
+    leaderboard = database.get_live_leaderboard(contest["id"], limit=10)
+
+    return {
+        "status": "success",
+        "contest": {"id": contest["id"], "name": contest["name"]},
+        "leaderboard": leaderboard
     }
 
 
@@ -1194,26 +1203,15 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
     contest = database.get_contest_by_id(contest_id)
     if not contest:
         return {"status": "error", "message": "Contest not found"}
-    
-    import datetime
-    now = datetime.datetime.now()
-    start_time = datetime.datetime.fromisoformat(contest["start_time"])
-    end_time = datetime.datetime.fromisoformat(contest["end_time"])
-    
-    if now < start_time:
-        return {"status": "error", "message": "Contest has not started yet"}
-    
-    if now > end_time:
-        return {"status": "error", "message": "Contest has ended"}
-    
+
     existing = database.check_user_participation(user["id"], contest_id)
     if existing:
         return {"status": "error", "message": "You have already participated in this contest"}
-    
+
     questions = database.shuffle_contest_questions(contest_id)
     if not questions:
         return {"status": "error", "message": "No questions available"}
-    
+
     quiz_questions = []
     for q in questions:
         quiz_questions.append({
@@ -1224,59 +1222,51 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
             "options": q["options"],
             "phonetic": q.get("phonetic", "")
         })
-    
+
     return {
         "status": "success",
         "message": "Quiz started",
         "contest_id": contest_id,
         "question_count": len(quiz_questions),
-        "time_remaining_seconds": int((end_time - now).total_seconds()),
+        "time_limit_seconds": 1800,
         "questions": quiz_questions
     }
 
 
 @app.post("/api/contests/{contest_id}/submit")
 async def submit_contest(contest_id: int, data: dict, user: dict = Depends(require_auth)):
-    """Submit contest answers"""
+    """Submit contest answers with live ranking"""
     contest = database.get_contest_by_id(contest_id)
     if not contest:
         return {"status": "error", "message": "Contest not found"}
-    
-    import datetime
-    now = datetime.datetime.now()
-    end_time = datetime.datetime.fromisoformat(contest["end_time"])
-    
-    if now > end_time:
-        return {"status": "error", "message": "Contest has ended"}
-    
+
     existing = database.check_user_participation(user["id"], contest_id)
     if existing:
         return {"status": "error", "message": "You have already participated"}
-    
+
     answers = data.get("answers", {})
     time_taken = data.get("time_taken_seconds", 0)
-    
+
     questions = database.get_contest_questions(contest_id)
     question_map = {str(q["question_number"]): q for q in questions}
-    
+
     correct_count = 0
     wrong_count = 0
     skipped_count = 0
-    
+
     for q_num, q_data in question_map.items():
         user_answer = answers.get(q_num, "").strip()
-        
+
         if not user_answer:
             skipped_count += 1
         elif user_answer == q_data["correct_answer"]:
             correct_count += 1
         else:
             wrong_count += 1
-    
+
     score = correct_count - wrong_count
-    
-    submitted_at = now.isoformat()
-    
+    submitted_at = datetime.now().isoformat()
+
     success = database.save_contest_participation(
         user_id=user["id"],
         contest_id=contest_id,
@@ -1287,19 +1277,25 @@ async def submit_contest(contest_id: int, data: dict, user: dict = Depends(requi
         time_taken_seconds=time_taken,
         submitted_at=submitted_at
     )
-    
+
     if not success:
         return {"status": "error", "message": "Failed to save participation"}
-    
+
+    # Get live rank after auto-ranking
+    rank_info = database.get_user_contest_rank(user["id"], contest_id)
+    leaderboard = database.get_live_leaderboard(contest_id, limit=5)
+
     return {
         "status": "success",
-        "message": "Quiz submitted successfully! Results will be available when the contest ends.",
+        "message": "Quiz submitted successfully!",
         "result": {
             "score": score,
             "correct": correct_count,
             "wrong": wrong_count,
             "skipped": skipped_count,
-            "time_seconds": time_taken
+            "time_seconds": time_taken,
+            "rank": rank_info,
+            "leaderboard": leaderboard
         }
     }
 
