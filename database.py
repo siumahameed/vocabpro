@@ -204,6 +204,29 @@ def init_db():
     except Exception as e:
         print(f"Migration note (fix preferred_time): {e}")
 
+    # Migration: ensure demo account exists with full access
+    try:
+        import hashlib
+        demo_pw = hashlib.sha256("demo123".encode()).hexdigest()
+        if USE_POSTGRES:
+            cursor.execute("""
+                INSERT INTO users (name, email, phone, password_hash, whatsapp_number, is_subscribed, is_paid, preferred_time, preferred_category, delivery_channel)
+                VALUES ('Demo User', 'demo@gmail.com', '01700000000', %s, '01700000000', TRUE, TRUE, '12:00', 'ielts', 'email')
+                ON CONFLICT (email) DO UPDATE SET is_subscribed = TRUE, is_paid = TRUE
+            """, (demo_pw,))
+        else:
+            cursor.execute("SELECT id FROM users WHERE email = 'demo@gmail.com'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO users (name, email, phone, password_hash, whatsapp_number, is_subscribed, is_paid, preferred_time, preferred_category, delivery_channel)
+                    VALUES ('Demo User', 'demo@gmail.com', '01700000000', ?, '01700000000', 1, 1, '12:00', 'ielts', 'email')
+                """, (demo_pw,))
+            else:
+                cursor.execute("UPDATE users SET is_subscribed = 1, is_paid = 1 WHERE email = 'demo@gmail.com'")
+        conn.commit()
+    except Exception as e:
+        print(f"Migration note (demo account): {e}")
+
     # Chat messages table
     try:
         if USE_POSTGRES:
@@ -2978,6 +3001,27 @@ def check_user_participation(user_id: int, contest_id: int) -> Optional[dict]:
     conn.close()
 
     return _row_to_dict(cursor, participation)
+
+
+def delete_user_participation(user_id: int, contest_id: int) -> bool:
+    """Delete a user's participation in a contest (for demo account re-play)"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    cursor = conn.cursor()
+    try:
+        if USE_POSTGRES:
+            cursor.execute("DELETE FROM quiz_participations WHERE user_id = %s AND contest_id = %s", (user_id, contest_id))
+        else:
+            cursor.execute("DELETE FROM quiz_participations WHERE user_id = ? AND contest_id = ?", (user_id, contest_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error deleting participation: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def save_contest_participation(user_id: int, contest_id: int, score: int, correct_count: int, wrong_count: int, skipped_count: int, time_taken_seconds: int, submitted_at: str) -> bool:

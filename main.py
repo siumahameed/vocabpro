@@ -160,6 +160,10 @@ def require_auth(user: Optional[dict] = Depends(get_current_user)):
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
 
+def is_demo_user(user: dict) -> bool:
+    """Check if user is the demo account"""
+    return user.get("email") == "demo@gmail.com"
+
 def require_admin(credentials: HTTPBasicCredentials = Depends(security)):
     """Require admin authentication"""
     if credentials.username != ADMIN_USERNAME or credentials.password != ADMIN_PASSWORD:
@@ -563,6 +567,7 @@ async def login(user: UserLogin, request: Request):
     
     # Set session
     request.session["user_id"] = verified_user["id"]
+    request.session["user_email"] = verified_user.get("email", "")
 
     return {"status": "success", "message": "Login successful", "redirect": "/dashboard"}
 
@@ -1105,11 +1110,12 @@ async def get_current_contest_info(request: Request):
         print(f"Error loading leaderboard: {e}")
         leaderboard = []
 
-    # Check if current user has participated
+    # Check if current user has participated (demo users can always re-participate)
     user_id = request.session.get("user_id")
+    user_email = request.session.get("user_email", "")
     user_participated = False
     user_rank_info = None
-    if user_id:
+    if user_id and user_email != "demo@gmail.com":
         try:
             participation = database.check_user_participation(user_id, contest["id"])
             if participation:
@@ -1158,9 +1164,10 @@ async def get_weekly_contest(request: Request):
     leaderboard = database.get_live_leaderboard(contest["id"], limit=5)
 
     user_id = request.session.get("user_id")
+    user_email = request.session.get("user_email", "")
     user_participated = False
     user_rank_info = None
-    if user_id:
+    if user_id and user_email != "demo@gmail.com":
         participation = database.check_user_participation(user_id, contest["id"])
         if participation:
             user_participated = True
@@ -1264,9 +1271,11 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
     if now > end_time:
         return {"status": "error", "message": "This contest has ended"}
 
-    existing = database.check_user_participation(user["id"], contest_id)
-    if existing:
-        return {"status": "error", "message": "You have already participated in this contest"}
+    # Demo user can participate unlimited times
+    if not is_demo_user(user):
+        existing = database.check_user_participation(user["id"], contest_id)
+        if existing:
+            return {"status": "error", "message": "You have already participated in this contest"}
 
     questions = database.shuffle_contest_questions(contest_id)
     if not questions:
@@ -1333,9 +1342,13 @@ async def submit_contest(contest_id: int, data: dict, user: dict = Depends(requi
     if not contest:
         return {"status": "error", "message": "Contest not found"}
 
-    existing = database.check_user_participation(user["id"], contest_id)
-    if existing:
-        return {"status": "error", "message": "You have already participated"}
+    # Demo user can submit unlimited times — delete previous participation if exists
+    if is_demo_user(user):
+        database.delete_user_participation(user["id"], contest_id)
+    else:
+        existing = database.check_user_participation(user["id"], contest_id)
+        if existing:
+            return {"status": "error", "message": "You have already participated"}
 
     answers = data.get("answers", {})
     time_taken = data.get("time_taken_seconds", 0)
