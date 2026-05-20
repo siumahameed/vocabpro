@@ -168,6 +168,13 @@ def is_demo_user(user: dict) -> bool:
     """Check if user is the demo account"""
     return user.get("email") == "demo@gmail.com"
 
+def is_demo_user_by_id(user_id: int) -> bool:
+    """Check if user_id belongs to the demo account via session or DB"""
+    if not user_id:
+        return False
+    user = database.get_user_by_id(user_id)
+    return user and user.get("email") == "demo@gmail.com"
+
 def require_admin(credentials: HTTPBasicCredentials = Depends(security)):
     """Require admin authentication"""
     if credentials.username != ADMIN_USERNAME or credentials.password != ADMIN_PASSWORD:
@@ -1116,10 +1123,9 @@ async def get_current_contest_info(request: Request):
 
     # Check if current user has participated (demo users can always re-participate)
     user_id = request.session.get("user_id")
-    user_email = request.session.get("user_email", "")
     user_participated = False
     user_rank_info = None
-    if user_id and user_email != "demo@gmail.com":
+    if user_id and not is_demo_user_by_id(user_id):
         try:
             participation = database.check_user_participation(user_id, contest["id"])
             if participation:
@@ -1168,10 +1174,9 @@ async def get_weekly_contest(request: Request):
     leaderboard = database.get_live_leaderboard(contest["id"], limit=5)
 
     user_id = request.session.get("user_id")
-    user_email = request.session.get("user_email", "")
     user_participated = False
     user_rank_info = None
-    if user_id and user_email != "demo@gmail.com":
+    if user_id and not is_demo_user_by_id(user_id):
         participation = database.check_user_participation(user_id, contest["id"])
         if participation:
             user_participated = True
@@ -1229,8 +1234,11 @@ async def get_contest_details(contest_id: int, user: dict = Depends(require_auth
     if not contest:
         return {"status": "error", "message": "Contest not found"}
     
-    participation = database.check_user_participation(user["id"], contest_id)
-    
+    # Demo user can always re-participate
+    participation = None
+    if not is_demo_user(user):
+        participation = database.check_user_participation(user["id"], contest_id)
+
     import datetime
     now = datetime.datetime.now()
     start_time = datetime.datetime.fromisoformat(contest["start_time"])
