@@ -1,25 +1,51 @@
 """
 VocabPro Email Sender Module
-Sends daily vocabulary via Brevo API (HTTPS, works on Render free tier)
+Sends daily vocabulary via Gmail SMTP (primary) or Brevo API (fallback)
 """
 
 import os
 import json
+import smtplib
 import urllib.request
 import urllib.error
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
+# Gmail SMTP Configuration
+GMAIL_USER = os.environ.get("GMAIL_USER", "")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+
+# Brevo API Configuration (fallback)
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "")
 SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "VocabPro")
 
 
-def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an HTML email via Brevo API (HTTPS)"""
-    if not BREVO_API_KEY:
-        print("Email error: BREVO_API_KEY not configured")
+def _send_via_gmail(to_email: str, subject: str, html_content: str) -> bool:
+    """Send email via Gmail SMTP"""
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         return False
-    if not SENDER_EMAIL:
-        print("Email error: BREVO_SENDER_EMAIL not configured")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"VocabPro <{GMAIL_USER}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
+            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_USER, to_email, msg.as_string())
+        print(f"Email sent to {to_email} (Gmail SMTP)")
+        return True
+    except Exception as e:
+        print(f"Gmail SMTP error to {to_email}: {e}")
+        return False
+
+
+def _send_via_brevo(to_email: str, subject: str, html_content: str) -> bool:
+    """Send email via Brevo API (fallback)"""
+    if not BREVO_API_KEY or not SENDER_EMAIL:
         return False
 
     payload = json.dumps({
@@ -43,17 +69,31 @@ def send_email(to_email: str, subject: str, html_content: str) -> bool:
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             if resp.status in (200, 201):
-                print(f"Email sent to {to_email}")
+                print(f"Email sent to {to_email} (Brevo)")
                 return True
-            print(f"Email error to {to_email}: HTTP {resp.status}")
+            print(f"Brevo error to {to_email}: HTTP {resp.status}")
             return False
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="ignore")
-        print(f"Email error to {to_email}: HTTP {e.code} - {body}")
+        print(f"Brevo error to {to_email}: HTTP {e.code} - {body}")
         return False
     except Exception as e:
-        print(f"Email error to {to_email}: {e}")
+        print(f"Brevo error to {to_email}: {e}")
         return False
+
+
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send an HTML email — tries Gmail SMTP first, falls back to Brevo"""
+    # Try Gmail SMTP first
+    if GMAIL_USER and GMAIL_APP_PASSWORD:
+        return _send_via_gmail(to_email, subject, html_content)
+
+    # Fallback to Brevo
+    if BREVO_API_KEY and SENDER_EMAIL:
+        return _send_via_brevo(to_email, subject, html_content)
+
+    print("Email error: No email provider configured (set GMAIL_USER+GMAIL_APP_PASSWORD or BREVO_API_KEY+BREVO_SENDER_EMAIL)")
+    return False
 
 
 def create_vocab_email_html(name: str, words: list) -> str:
