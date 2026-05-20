@@ -672,9 +672,9 @@ async def update_preferred_time(data: TimeUpdate, user: dict = Depends(require_a
     hour = int(data.preferred_time.split(':')[0])
     minute = int(data.preferred_time.split(':')[1])
     
-    # Allow times from 11:00 (11 AM) to 23:00 (11 PM)
-    if hour < 11 or hour >= 23:
-        return {"status": "error", "message": "Time must be between 11:00 AM and 11:00 PM"}
+    # Allow times from 11:00 (11 AM) to 23:59 (11:59 PM)
+    if hour < 11 or hour > 23:
+        return {"status": "error", "message": "Time must be between 11:00 AM and 11:59 PM"}
     
     success = database.update_preferred_time(user["id"], data.preferred_time)
     
