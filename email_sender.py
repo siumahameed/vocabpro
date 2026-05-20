@@ -85,16 +85,19 @@ def _send_via_brevo(to_email: str, subject: str, html_content: str) -> bool:
 
 
 def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an HTML email — tries Gmail SMTP first, falls back to Brevo"""
-    # Try Gmail SMTP first
+    """Send an HTML email — tries Brevo first (HTTPS, works on Render), falls back to Gmail SMTP"""
+    # Try Brevo first (HTTPS API — works on Render free tier)
+    if BREVO_API_KEY and SENDER_EMAIL:
+        result = _send_via_brevo(to_email, subject, html_content)
+        if result:
+            return True
+        print(f"Brevo failed for {to_email}, trying Gmail SMTP...")
+
+    # Fallback to Gmail SMTP (blocked on Render, works locally)
     if GMAIL_USER and GMAIL_APP_PASSWORD:
         return _send_via_gmail(to_email, subject, html_content)
 
-    # Fallback to Brevo
-    if BREVO_API_KEY and SENDER_EMAIL:
-        return _send_via_brevo(to_email, subject, html_content)
-
-    print("Email error: No email provider configured (set GMAIL_USER+GMAIL_APP_PASSWORD or BREVO_API_KEY+BREVO_SENDER_EMAIL)")
+    print("Email error: No email provider configured")
     return False
 
 
