@@ -5,7 +5,7 @@ PostgreSQL for production, SQLite for local
 
 import os
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 
 # Check if PostgreSQL is configured
@@ -230,9 +230,9 @@ def init_db():
     # (previous Brevo sends returned 200 but emails were blocked by freemail domain restriction)
     try:
         if USE_POSTGRES:
-            cursor.execute("UPDATE users SET last_word_sent_date = NULL WHERE last_word_sent_date = CURRENT_DATE")
+            cursor.execute("UPDATE users SET last_word_sent_date = NULL")
         else:
-            cursor.execute("UPDATE users SET last_word_sent_date = NULL WHERE last_word_sent_date = date('now')")
+            cursor.execute("UPDATE users SET last_word_sent_date = NULL")
         conn.commit()
         print("Reset last_word_sent_date for re-delivery via Gmail SMTP")
     except Exception as e:
@@ -669,7 +669,10 @@ def get_users_needing_words(current_time: str) -> list:
         return []
 
     cursor = conn.cursor()
-    today = datetime.now().date().isoformat()
+    # Use Bangladesh time (UTC+6) for date comparison since users set preferred_time in BD time
+    from datetime import timezone
+    bd_now = datetime.now(timezone(timedelta(hours=6)))
+    today = bd_now.date().isoformat()
 
     # Find users where:
     # 1. is_subscribed = TRUE
@@ -707,7 +710,9 @@ def update_last_word_sent_date(user_id: int) -> bool:
 
     cursor = conn.cursor()
     try:
-        today = datetime.now().date().isoformat()
+        # Use Bangladesh time (UTC+6) for consistency with preferred_time
+        bd_now = datetime.now(timezone(timedelta(hours=6)))
+        today = bd_now.date().isoformat()
         if USE_POSTGRES:
             cursor.execute("UPDATE users SET last_word_sent_date = %s WHERE id = %s", (today, user_id))
         else:

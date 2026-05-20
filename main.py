@@ -446,6 +446,22 @@ async def ping():
     """Simple ping endpoint for cron job"""
     return {"status": "ok", "time": datetime.now().isoformat()}
 
+@app.get("/test-email")
+async def test_email(request: Request):
+    """Test email sending - admin only"""
+    user = get_current_user(request)
+    if not user or not user.get("is_admin"):
+        return {"error": "Admin only"}
+    try:
+        result = email_sender.send_email(
+            user["email"],
+            "VocabPro Email Test",
+            "<h2>Email is working!</h2><p>Gmail SMTP is configured correctly.</p>"
+        )
+        return {"success": result, "email": user["email"]}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/logout")
 async def logout(request: Request):
     """Logout"""
@@ -1640,8 +1656,11 @@ def send_daily_vocabulary():
     Uses robust approach: finds ALL users whose preferred_time has passed today
     and who haven't received words yet. Works even if app was sleeping."""
     try:
-        current_time = datetime.now().strftime("%H:%M")
-        print(f"[{datetime.now()}] Daily vocabulary check — current time: {current_time}")
+        # Use Bangladesh time (UTC+6) since users set preferred_time in BD time
+        from datetime import timezone, timedelta as td
+        bd_now = datetime.now(timezone(td(hours=6)))
+        current_time = bd_now.strftime("%H:%M")
+        print(f"[{datetime.now()}] Daily vocabulary check — BD time: {current_time}, UTC: {datetime.now().strftime('%H:%M')}")
 
         # Find all users whose preferred_time has passed and haven't received words today
         users = database.get_users_needing_words(current_time)
