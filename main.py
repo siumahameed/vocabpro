@@ -851,21 +851,25 @@ async def broadcast(data: dict, _: bool = Depends(require_admin_session)):
 @app.post("/api/admin/generate-vocabulary")
 async def generate_vocabulary(data: dict, _: bool = Depends(require_admin_session)):
     """Generate vocabulary using OpenRouter AI and save to database"""
-    count = data.get("count", 50)
-    category = data.get("category", None)
+    try:
+        count = data.get("count", 50)
+        category = data.get("category", None)
 
-    result = whatsapp_bot.generate_vocabulary(count, category)
+        result = whatsapp_bot.generate_vocabulary(count, category)
 
-    if result.get("success"):
-        cat_label = f" ({category})" if category else ""
-        return {
-            "status": "success",
-            "message": f"Generated {result.get('generated')}{cat_label} words, saved {result.get('saved')} to database",
-            "generated": result.get("generated"),
-            "saved": result.get("saved")
-        }
-    else:
-        return {"status": "error", "message": result.get("error", "Unknown error")}
+        if result.get("success"):
+            cat_label = f" ({category})" if category else ""
+            return {
+                "status": "success",
+                "message": f"Generated {result.get('generated')}{cat_label} words, saved {result.get('saved')} to database",
+                "generated": result.get("generated"),
+                "saved": result.get("saved")
+            }
+        else:
+            return {"status": "error", "message": result.get("error", "Unknown error")}
+    except Exception as e:
+        print(f"Generate vocabulary error: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.post("/api/admin/clear-vocabulary")
 async def clear_vocabulary(_: bool = Depends(require_admin_session)):

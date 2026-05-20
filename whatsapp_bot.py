@@ -272,7 +272,9 @@ Generate {count} words:"""
         }
 
         try:
+            print(f"Trying OpenRouter model: {model}...")
             response = requests.post(url, headers=headers, json=data, timeout=120)
+            print(f"OpenRouter response: {response.status_code}")
 
             if response.status_code == 200:
                 result = response.json()
