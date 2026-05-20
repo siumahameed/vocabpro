@@ -76,9 +76,25 @@
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Welcome, {{ user.name }}! 👋</h1>
             <p class="text-gray-600 text-sm sm:text-base">Manage your vocabulary learning journey</p>
         </div>
-        
+
+        <!-- Demo User Banner -->
+        {% if user.email == 'demo@gmail.com' %}
+        <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-400 p-4 mb-8 rounded-r-lg">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span class="text-2xl"> </span>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-purple-700">
+                        <strong>Demo Account:</strong> You have unlimited access to all features — contests, quizzes, and challenges. Play as many times as you want!
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Status Banner -->
-        {% if not user.is_paid %}
+        {% if not user.is_paid and user.email != 'demo@gmail.com' %}
         <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-lg">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
