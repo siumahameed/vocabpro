@@ -92,7 +92,10 @@ def _keep_alive_ping():
 def _run_scheduler():
     """Background thread that runs pending scheduled jobs."""
     while True:
-        schedule.run_pending()
+        try:
+            schedule.run_pending()
+        except Exception as e:
+            print(f"Scheduler error: {e}")
         time.sleep(30)  # check every 30 seconds
 
 @asynccontextmanager
@@ -102,9 +105,9 @@ async def lifespan(app: FastAPI):
     print(f"[{datetime.now()}] Running initial vocabulary check on startup...")
     threading.Thread(target=send_daily_vocabulary, daemon=True).start()
 
-    # Start scheduler - runs every 15 minutes to catch custom time preferences
-    schedule.every(15).minutes.do(send_daily_vocabulary)
-    print("Scheduler started - Checking every 15 minutes for users")
+    # Start scheduler - runs every 10 minutes to catch users whose time has passed
+    schedule.every(10).minutes.do(send_daily_vocabulary)
+    print("Scheduler started - Checking every 10 minutes for users needing words")
 
     # Start scheduler runner thread (schedule.run_pending() must be called in a loop)
     scheduler_thread = threading.Thread(target=_run_scheduler, daemon=True)
@@ -1633,37 +1636,44 @@ async def chatbot_clear(data: dict, user: dict = Depends(require_auth)):
 # ==================== SCHEDULED TASKS ====================
 
 def send_daily_vocabulary():
-    """Send daily vocabulary to all active subscribers"""
-    current_time = datetime.now().strftime("%H:%M")
-    print(f"[{datetime.now()}] Checking for users with preferred time near: {current_time}")
+    """Send daily vocabulary to all active subscribers.
+    Uses robust approach: finds ALL users whose preferred_time has passed today
+    and who haven't received words yet. Works even if app was sleeping."""
+    try:
+        current_time = datetime.now().strftime("%H:%M")
+        print(f"[{datetime.now()}] Daily vocabulary check — current time: {current_time}")
 
-    # Use 15-minute window so users are caught even if scheduler doesn't run at exact minute
-    users = database.get_users_by_time(current_time, window_minutes=15)
-    if not users:
-        print(f"No users scheduled near {current_time}")
-        return
+        # Find all users whose preferred_time has passed and haven't received words today
+        users = database.get_users_needing_words(current_time)
+        if not users:
+            print(f"No users need words right now")
+            return
 
-    print(f"Found {len(users)} users wanting words near {current_time}")
+        print(f"Found {len(users)} users needing daily words")
 
-    # Split by delivery channel
-    email_users = [u for u in users if u.get("delivery_channel", "email") in ("email", "both")]
-    whatsapp_users = [u for u in users if u.get("delivery_channel") in ("whatsapp", "both")]
+        # Split by delivery channel
+        email_users = [u for u in users if u.get("delivery_channel", "email") in ("email", "both")]
+        whatsapp_users = [u for u in users if u.get("delivery_channel") in ("whatsapp", "both")]
 
-    if email_users:
-        print(f"Sending to {len(email_users)} email users...")
-        try:
-            result = email_sender.send_to_email_subscribers(email_users)
-            print(f"Email result: {result}")
-        except Exception as e:
-            print(f"Email sending error: {e}")
+        if email_users:
+            print(f"Sending to {len(email_users)} email users...")
+            try:
+                result = email_sender.send_to_email_subscribers(email_users)
+                print(f"Email result: {result}")
+            except Exception as e:
+                print(f"Email sending error: {e}")
 
-    if whatsapp_users:
-        print(f"Sending to {len(whatsapp_users)} WhatsApp users...")
-        try:
-            result = whatsapp_bot.send_to_all_subscribers(whatsapp_users)
-            print(f"WhatsApp result: {result}")
-        except Exception as e:
-            print(f"WhatsApp sending error: {e}")
+        if whatsapp_users:
+            print(f"Sending to {len(whatsapp_users)} WhatsApp users...")
+            try:
+                result = whatsapp_bot.send_to_all_subscribers(whatsapp_users)
+                print(f"WhatsApp result: {result}")
+            except Exception as e:
+                print(f"WhatsApp sending error: {e}")
+    except Exception as e:
+        import traceback
+        print(f"CRITICAL: send_daily_vocabulary failed: {e}")
+        traceback.print_exc()
 
 # ==================== MAIN ====================
 

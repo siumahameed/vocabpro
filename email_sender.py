@@ -214,6 +214,7 @@ def send_to_email_subscribers(subscribers: list) -> dict:
                 database.update_last_word_index(user_id, new_index)
                 database.increment_leaderboard_words(user_id, 10)
                 database.update_user_progress(user_id)
+                database.update_last_word_sent_date(user_id)
                 print(f"Email sent to {email}")
             else:
                 failed += 1

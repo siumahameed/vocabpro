@@ -194,6 +194,19 @@ def init_db():
     except Exception as e:
         print(f"Migration note: {e}")
 
+    # Migration: add last_word_sent_date column for daily delivery tracking
+    try:
+        if USE_POSTGRES:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_word_sent_date DATE")
+        else:
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'last_word_sent_date' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN last_word_sent_date DATE")
+        conn.commit()
+    except Exception as e:
+        print(f"Migration note (last_word_sent_date): {e}")
+
     # Migration: fix users with old default preferred_time '09:30' (outside allowed 11:00-23:00 range)
     try:
         if USE_POSTGRES:
@@ -615,6 +628,68 @@ def get_users_by_time(time_str: str, window_minutes: int = 15) -> list:
     if not users or not columns:
         return []
     return [dict(zip(columns, row)) for row in users]
+
+
+def get_users_needing_words(current_time: str) -> list:
+    """Get subscribed users whose preferred_time has passed today and haven't received words yet.
+    This is robust against app sleep/restart — it catches ALL users who were missed."""
+    conn = get_db_connection()
+    if not conn:
+        return []
+
+    cursor = conn.cursor()
+    today = datetime.now().date().isoformat()
+
+    # Find users where:
+    # 1. is_subscribed = TRUE
+    # 2. preferred_time <= current_time (their scheduled time has passed)
+    # 3. last_word_sent_date IS NULL OR last_word_sent_date < today (haven't received words today)
+    if USE_POSTGRES:
+        cursor.execute("""
+            SELECT * FROM users
+            WHERE is_subscribed = TRUE
+              AND preferred_time <= %s
+              AND (last_word_sent_date IS NULL OR last_word_sent_date < %s)
+        """, (current_time, today))
+    else:
+        cursor.execute("""
+            SELECT * FROM users
+            WHERE is_subscribed = 1
+              AND preferred_time <= ?
+              AND (last_word_sent_date IS NULL OR last_word_sent_date < ?)
+        """, (current_time, today))
+
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
+    users = cursor.fetchall()
+    conn.close()
+
+    if not users or not columns:
+        return []
+    return [dict(zip(columns, row)) for row in users]
+
+
+def update_last_word_sent_date(user_id: int) -> bool:
+    """Mark that a user received their daily words today."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    cursor = conn.cursor()
+    try:
+        today = datetime.now().date().isoformat()
+        if USE_POSTGRES:
+            cursor.execute("UPDATE users SET last_word_sent_date = %s WHERE id = %s", (today, user_id))
+        else:
+            cursor.execute("UPDATE users SET last_word_sent_date = ? WHERE id = ?", (today, user_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating last_word_sent_date for user {user_id}: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
 
 def update_preferred_time(user_id: int, preferred_time: str) -> bool:
     conn = get_db_connection()
