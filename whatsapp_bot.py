@@ -247,7 +247,7 @@ Return a JSON array. Each element:
 
 Rules:
 - IPA phonetic with slashes for every word
-- meaning_bn: ONE simple Bengali meaning only (no commas, no multiple meanings). Pick the most common/easiest meaning.
+- meaning_bn: ONE simple Bengali meaning ONLY in Bengali script. NO English words, NO parenthetical explanations, NO transliterations. Just the pure Bengali meaning. Example good: "ল্যাটেক্স". Example BAD: "ল্যাটেক্স (প্রাকৃতিক রাবার বা সফটওয়্যার টাইপসেটিং সিস্টেম)"
 - example: Short sentence, MAX 10 words. Simple and easy to understand.
 - Return ONLY the JSON array, nothing else
 
@@ -357,11 +357,11 @@ def enrich_words_with_ai(word_list: list, category: str = "", batch_size: int = 
 Words: {words_str}
 
 For each word return:
-{{"word":"the_word","phonetic":"/IPA pronunciation/","meaning_bn":"bengali meaning in bengali script","example":"example sentence"}}
+{{"word":"the_word","phonetic":"/IPA pronunciation/","meaning_bn":"bengali meaning","example":"example sentence"}}
 
 Rules:
 - IPA phonetic with slashes for every word
-- Bengali script for meaning_bn
+- meaning_bn: ONE simple Bengali meaning ONLY in Bengali script. NO English words, NO parenthetical explanations like (natural rubber or software typesetting system). Just the pure Bengali word/phrase. Example good: "ল্যাটেক্স". Example BAD: "ল্যাটেক্স (প্রাকৃতিক রাবার বা সফটওয়্যার টাইপসেটিং সিস্টেম)"
 - Natural English example sentence
 - Return ONLY the JSON array, nothing else
 - Include ALL {len(batch)} words, do not skip any"""
@@ -834,7 +834,7 @@ For each word return:
 
 Rules:
 - IPA phonetic with slashes
-- Bengali script for meaning_bn
+- meaning_bn: ONE simple Bengali meaning ONLY in Bengali script. NO English words, NO parenthetical explanations. Just the pure Bengali meaning.
 - Natural English example sentence
 - Return ONLY the JSON array
 - Include ALL {len(batch)} words"""

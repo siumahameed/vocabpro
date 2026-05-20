@@ -1270,8 +1270,10 @@ async def start_contest(contest_id: int, user: dict = Depends(require_auth)):
 
     questions = database.shuffle_contest_questions(contest_id)
     if not questions:
-        # Regenerate questions if missing
-        result = database.generate_contest_questions(contest_id, 25)
+        # Regenerate questions if missing — daily challenge uses mixed hard categories
+        contest_type = contest.get("contest_type", "daily")
+        hint = "general" if contest_type == "daily" else None
+        result = database.generate_contest_questions(contest_id, contest.get("question_count", 25), category_hint=hint)
         if result.get("success"):
             questions = database.shuffle_contest_questions(contest_id)
         if not questions:
@@ -1448,7 +1450,9 @@ async def admin_generate_questions(contest_id: int, _: bool = Depends(require_ad
     if not contest:
         return {"status": "error", "message": "Contest not found"}
     
-    result = database.generate_contest_questions(contest_id, contest["question_count"])
+    contest_type = contest.get("contest_type", "daily")
+    hint = "general" if contest_type == "daily" else None
+    result = database.generate_contest_questions(contest_id, contest["question_count"], category_hint=hint)
     
     if result.get("success"):
         return {"status": "success", "message": f"Generated {result.get('generated')} questions"}

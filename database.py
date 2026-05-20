@@ -3305,16 +3305,27 @@ def generate_contest_questions(contest_id: int, question_count: int = 25, catego
         words = []
 
         if category_hint == "general":
-            # Daily challenge: prefer general/easy category words
-            if USE_POSTGRES:
-                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE 'general' ORDER BY RANDOM() LIMIT %s", (question_count,))
-            else:
-                cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE 'general' ORDER BY RANDOM() LIMIT ?", (question_count,))
-            words = [(w[0], w[1], w[2], w[3]) for w in cursor.fetchall()]
+            # Daily challenge: 40% GRE, 30% IELTS, 30% common — hard mix
+            gre_count = int(question_count * 0.4)
+            ielts_count = int(question_count * 0.3)
+            common_count = question_count - gre_count - ielts_count  # remaining ~30%
 
-            # If not enough general words, fill from any category
+            seen_ids = set()
+
+            for cat_name, cat_count in [("gre", gre_count), ("ielts", ielts_count), ("common", common_count)]:
+                if cat_count <= 0:
+                    continue
+                if USE_POSTGRES:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE %s ORDER BY RANDOM() LIMIT %s", (f"%{cat_name}%", cat_count * 2))
+                else:
+                    cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary WHERE LOWER(category) LIKE ? ORDER BY RANDOM() LIMIT ?", (f"%{cat_name}%", cat_count * 2))
+                for w in cursor.fetchall():
+                    if w[0] not in seen_ids and len(words) < question_count:
+                        words.append((w[0], w[1], w[2], w[3]))
+                        seen_ids.add(w[0])
+
+            # Fill remaining from any category if needed
             if len(words) < question_count:
-                seen_ids = {w[0] for w in words}
                 remaining = question_count - len(words)
                 if USE_POSTGRES:
                     cursor.execute("SELECT id, word, meaning_bn, phonetic FROM vocabulary ORDER BY RANDOM() LIMIT %s", (remaining * 3,))
@@ -3326,6 +3337,9 @@ def generate_contest_questions(contest_id: int, question_count: int = 25, catego
                         seen_ids.add(w[0])
                     if len(words) >= question_count:
                         break
+
+            # Final shuffle to mix categories randomly
+            random.shuffle(words)
         else:
             # Weekly contest: 60% from most popular user category, 40% from others
             try:

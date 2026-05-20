@@ -436,7 +436,7 @@
                         </thead>
                         <tbody id="vocabTableBody" class="divide-y">
                             {% for w in vocabulary %}
-                            <tr class="hover:bg-gray-50">
+                            <tr class="hover:bg-gray-50" data-word-id="{{ w.id }}">
                                 <td class="px-3 py-2 text-gray-500 hidden md:table-cell">{{ w.id }}</td>
                                 <td class="px-3 py-2 font-medium">{{ w.word }}</td>
                                 <td class="px-3 py-2 text-gray-500 hidden lg:table-cell">{{ w.phonetic or '-' }}</td>
@@ -969,7 +969,7 @@ async function searchVocabulary() {
 function renderVocabTable(words) {
     const tbody = document.getElementById('vocabTableBody');
     tbody.innerHTML = words.map(w => `
-        <tr class="hover:bg-gray-50">
+        <tr class="hover:bg-gray-50" data-word-id="${w.id}">
             <td class="px-3 py-2 text-gray-500">${w.id}</td>
             <td class="px-3 py-2 font-medium">${w.word}</td>
             <td class="px-3 py-2 text-gray-500">${w.phonetic || '-'}</td>
@@ -1049,8 +1049,40 @@ async function saveWord(e) {
         const data = await response.json();
         if (data.status === 'success') {
             closeWordModal();
-            alert(data.message);
-            location.reload();
+            if (wordId) {
+                // Update row in-place instead of full page reload
+                const row = document.querySelector(`tr[data-word-id="${wordId}"]`);
+                if (row) {
+                    const cells = row.children;
+                    cells[1].textContent = payload.word;
+                    cells[2].textContent = payload.phonetic || '-';
+                    cells[3].textContent = payload.meaning_bn;
+                    // Update category badges
+                    const catCell = cells[4];
+                    if (payload.category) {
+                        catCell.innerHTML = payload.category.split(',').map(cat => {
+                            const c = cat.trim().toLowerCase();
+                            const cls = c === 'ielts' ? 'status-approved' : c === 'gre' ? 'status-pending' : c === 'common' ? 'bg-green-100 text-green-800' : 'status-trial';
+                            return `<span class="status-badge inline-block mb-1 ${cls}">${cat.trim()}</span>`;
+                        }).join('');
+                    } else {
+                        catCell.innerHTML = '<span class="status-badge inline-block mb-1 status-trial">uncategorized</span>';
+                    }
+                    cells[5].textContent = payload.example || '-';
+                    // Update the edit button's onclick data
+                    const editBtn = cells[6].querySelector('button');
+                    if (editBtn) {
+                        const updatedWord = {id: parseInt(wordId), word: payload.word, phonetic: payload.phonetic, meaning_bn: payload.meaning_bn, category: payload.category, example: payload.example};
+                        editBtn.setAttribute('onclick', `editWord(${JSON.stringify(updatedWord).replace(/'/g, "&#39;")})`);
+                    }
+                    // Flash highlight
+                    row.classList.add('bg-green-50');
+                    setTimeout(() => row.classList.remove('bg-green-50'), 2000);
+                }
+            } else {
+                // New word added — reload to show it
+                location.reload();
+            }
         } else {
             alert('Error: ' + data.message);
         }
