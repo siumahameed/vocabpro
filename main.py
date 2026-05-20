@@ -447,20 +447,41 @@ async def ping():
     return {"status": "ok", "time": datetime.now().isoformat()}
 
 @app.get("/test-email")
-async def test_email(request: Request):
-    """Test email sending - admin only"""
-    user = get_current_user(request)
-    if not user or not user.get("is_admin"):
-        return {"error": "Admin only"}
+async def test_email(email: str = ""):
+    """Test email sending — /test-email?email=you@gmail.com"""
+    if not email:
+        return {"error": "Add ?email=your@email.com to the URL"}
     try:
         result = email_sender.send_email(
-            user["email"],
+            email,
             "VocabPro Email Test",
             "<h2>Email is working!</h2><p>Gmail SMTP is configured correctly.</p>"
         )
-        return {"success": result, "email": user["email"]}
+        return {"success": result, "email": email}
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/debug-email")
+async def debug_email():
+    """Debug email configuration"""
+    import os
+    gmail_user = os.environ.get("GMAIL_USER", "")
+    gmail_pass = os.environ.get("GMAIL_APP_PASSWORD", "")
+    brevo_key = os.environ.get("BREVO_API_KEY", "")
+    brevo_sender = os.environ.get("BREVO_SENDER_EMAIL", "")
+    return {
+        "gmail_user_set": bool(gmail_user),
+        "gmail_user_value": gmail_user[:5] + "***" if gmail_user else "",
+        "gmail_pass_set": bool(gmail_pass),
+        "gmail_pass_length": len(gmail_pass),
+        "brevo_key_set": bool(brevo_key),
+        "brevo_sender_set": bool(brevo_sender),
+        "current_time": datetime.now().strftime("%H:%M"),
+        "email_sender_module": "loaded" if email_sender else "not loaded",
+        "GMAIL_USER_attr": bool(email_sender.GMAIL_USER),
+        "GMAIL_PASS_attr": bool(email_sender.GMAIL_APP_PASSWORD),
+    }
 
 @app.get("/logout")
 async def logout(request: Request):
