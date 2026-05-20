@@ -456,7 +456,7 @@
                                 <td class="px-3 py-2">
                                     <div class="flex gap-2">
                                         <button onclick='editWord({{ w|tojson }})' class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
-                                        <button onclick="deleteWord({{ w.id }}, '{{ w.word }}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                                        <button onclick="deleteWord({{ w.id }}, {{ w.word|tojson }})" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
                                     </div>
                                 </td>
                             </tr>
@@ -652,7 +652,7 @@ function showTab(tabName, el) {
 
     if (tabName === 'payments') loadPayments();
     if (tabName === 'analytics') loadAnalytics();
-    if (tabName === 'vocabulary') loadVocabularyCount();
+    if (tabName === 'vocabulary') { loadVocabularyCount(); searchVocabulary(); }
     if (tabName === 'requests') loadCategoryRequests();
 }
 
@@ -956,7 +956,11 @@ async function searchVocabulary() {
     const category = document.getElementById('vocabCategoryFilter').value;
 
     try {
-        const response = await fetch(`/api/admin/vocabulary?search=${encodeURIComponent(search)}&category=${category}`);
+        const response = await fetch(`/api/admin/vocabulary?search=${encodeURIComponent(search)}&category=${category}`, { credentials: 'same-origin' });
+        if (!response.ok) {
+            console.error('Search failed:', response.status);
+            return;
+        }
         const data = await response.json();
         if (data.status === 'success') {
             renderVocabTable(data.vocabulary);
@@ -966,31 +970,41 @@ async function searchVocabulary() {
     }
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 function renderVocabTable(words) {
     const tbody = document.getElementById('vocabTableBody');
-    tbody.innerHTML = words.map(w => `
-        <tr class="hover:bg-gray-50" data-word-id="${w.id}">
+    tbody.innerHTML = words.map(w => {
+        const catHtml = w.category ? w.category.split(',').map(c => {
+            c = c.trim().toLowerCase();
+            let cls = 'status-trial';
+            if (c === 'ielts') cls = 'status-approved';
+            else if (c === 'gre') cls = 'status-pending';
+            else if (c === 'common') cls = 'bg-green-100 text-green-800';
+            return '<span class="status-badge inline-block mb-1 ' + cls + '">' + escapeHtml(c) + '</span>';
+        }).join(' ') : '<span class="status-badge inline-block mb-1 status-trial">uncategorized</span>';
+
+        const wordData = JSON.stringify(w);
+        const wordEscaped = escapeHtml(w.word).replace(/'/g, "\\'");
+
+        return `<tr class="hover:bg-gray-50" data-word-id="${w.id}">
             <td class="px-3 py-2 text-gray-500">${w.id}</td>
-            <td class="px-3 py-2 font-medium">${w.word}</td>
-            <td class="px-3 py-2 text-gray-500">${w.phonetic || '-'}</td>
-            <td class="px-3 py-2">${w.meaning_bn}</td>
-            <td class="px-3 py-2">${w.category ? w.category.split(',').map(c => {
-                c = c.trim().toLowerCase();
-                let cls = 'status-trial';
-                if (c === 'ielts') cls = 'status-approved';
-                else if (c === 'gre') cls = 'status-pending';
-                else if (c === 'common') cls = 'bg-green-100 text-green-800';
-                return '<span class="status-badge inline-block mb-1 ' + cls + '">' + c + '</span>';
-            }).join(' ') : '<span class="status-badge inline-block mb-1 status-trial">uncategorized</span>'}</td>
-            <td class="px-3 py-2 text-gray-600 max-w-xs truncate">${w.example || '-'}</td>
+            <td class="px-3 py-2 font-medium">${escapeHtml(w.word)}</td>
+            <td class="px-3 py-2 text-gray-500">${escapeHtml(w.phonetic) || '-'}</td>
+            <td class="px-3 py-2">${escapeHtml(w.meaning_bn)}</td>
+            <td class="px-3 py-2">${catHtml}</td>
+            <td class="px-3 py-2 text-gray-600 max-w-xs truncate">${escapeHtml(w.example) || '-'}</td>
             <td class="px-3 py-2">
                 <div class="flex gap-2">
-                    <button onclick='editWord(${JSON.stringify(w).replace(/'/g, "&#39;")})' class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
-                    <button onclick="deleteWord(${w.id}, '${w.word}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                    <button onclick='editWord(${wordData.replace(/'/g, "&#39;")})' class="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
+                    <button onclick="deleteWord(${w.id}, '${wordEscaped}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
                 </div>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function showAddWordForm() {

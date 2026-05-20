@@ -2054,7 +2054,7 @@ def search_vocabulary(query: str = "", category: str = "all") -> list:
                 base_query += " AND LOWER(category) LIKE LOWER(?)"
             params.append(f"%{category}%")
 
-        base_query += " ORDER BY word ASC"
+        base_query += " ORDER BY word ASC LIMIT 500"
 
         cursor.execute(base_query, params)
         words = cursor.fetchall()
