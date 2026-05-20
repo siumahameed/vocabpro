@@ -89,12 +89,22 @@ def _keep_alive_ping():
             print(f"Keep-alive ping failed: {e}")
 
 
+def _run_scheduler():
+    """Background thread that runs pending scheduled jobs."""
+    while True:
+        schedule.run_pending()
+        time.sleep(30)  # check every 30 seconds
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Start scheduler - runs every 15 minutes to catch custom time preferences
     schedule.every(15).minutes.do(send_daily_vocabulary)
     print("Scheduler started - Checking every 15 minutes for users")
+
+    # Start scheduler runner thread (schedule.run_pending() must be called in a loop)
+    scheduler_thread = threading.Thread(target=_run_scheduler, daemon=True)
+    scheduler_thread.start()
 
     # Start keep-alive thread to prevent Render cold starts
     keep_alive_thread = threading.Thread(target=_keep_alive_ping, daemon=True)
@@ -257,7 +267,7 @@ async def update_profile(data: dict, user: dict = Depends(require_auth)):
     """Update user profile"""
     name = data.get("name", "").strip()
     phone = data.get("phone", "").strip()
-    preferred_time = data.get("preferred_time", "09:30")
+    preferred_time = data.get("preferred_time", "12:00")
     timezone = data.get("timezone", "Asia/Dhaka")
     delivery_channel = data.get("delivery_channel", "email")
 
@@ -269,6 +279,15 @@ async def update_profile(data: dict, user: dict = Depends(require_auth)):
 
     if delivery_channel not in ["email", "whatsapp", "both"]:
         delivery_channel = "email"
+
+    # Validate preferred_time is within allowed range
+    import re
+    if re.match(r'^(?:[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$', preferred_time):
+        hour = int(preferred_time.split(':')[0])
+        if hour < 11 or hour >= 23:
+            preferred_time = "12:00"  # fallback to default if out of range
+    else:
+        preferred_time = "12:00"  # fallback if invalid format
 
     success = database.update_user_profile(user["id"], {
         "name": name,
@@ -568,9 +587,9 @@ async def submit_payment(payment: PaymentSubmit, user: dict = Depends(require_au
 @app.post("/api/update-time")
 async def update_preferred_time(data: TimeUpdate, user: dict = Depends(require_auth)):
     """Update user's preferred message time"""
-    # Validate time format (HH:MM)
+    # Validate time format (HH:MM — accepts leading zero from HTML input)
     import re
-    if not re.match(r'^(?:[1-9]|1[0-9]|2[0-3]):[0-5][0-9]$', data.preferred_time):
+    if not re.match(r'^(?:[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$', data.preferred_time):
         return {"status": "error", "message": "Invalid time format"}
     
     hour = int(data.preferred_time.split(':')[0])
@@ -1587,14 +1606,15 @@ async def chatbot_clear(data: dict, user: dict = Depends(require_auth)):
 def send_daily_vocabulary():
     """Send daily vocabulary to all active subscribers"""
     current_time = datetime.now().strftime("%H:%M")
-    print(f"[{datetime.now()}] Checking for users with preferred time: {current_time}")
+    print(f"[{datetime.now()}] Checking for users with preferred time near: {current_time}")
 
-    users = database.get_users_by_time(current_time)
+    # Use 15-minute window so users are caught even if scheduler doesn't run at exact minute
+    users = database.get_users_by_time(current_time, window_minutes=15)
     if not users:
-        print(f"No users scheduled for {current_time}")
+        print(f"No users scheduled near {current_time}")
         return
 
-    print(f"Found {len(users)} users wanting words at {current_time}")
+    print(f"Found {len(users)} users wanting words near {current_time}")
 
     # Split by delivery channel
     email_users = [u for u in users if u.get("delivery_channel", "email") in ("email", "both")]

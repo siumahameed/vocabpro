@@ -91,7 +91,7 @@ def init_db():
             paid_date DATE,
             is_admin BOOLEAN DEFAULT FALSE,
             timezone TEXT DEFAULT 'Asia/Dhaka',
-            preferred_time TEXT DEFAULT '09:30',
+            preferred_time TEXT DEFAULT '12:00',
             preferred_category TEXT DEFAULT 'ielts',
             last_word_index INTEGER DEFAULT 0,
             words_learned INTEGER DEFAULT 0,
@@ -193,6 +193,16 @@ def init_db():
         conn.commit()
     except Exception as e:
         print(f"Migration note: {e}")
+
+    # Migration: fix users with old default preferred_time '09:30' (outside allowed 11:00-23:00 range)
+    try:
+        if USE_POSTGRES:
+            cursor.execute("UPDATE users SET preferred_time = '12:00' WHERE preferred_time < '11:00'")
+        else:
+            cursor.execute("UPDATE users SET preferred_time = '12:00' WHERE preferred_time < '11:00'")
+        conn.commit()
+    except Exception as e:
+        print(f"Migration note (fix preferred_time): {e}")
 
     # Chat messages table
     try:
@@ -532,26 +542,56 @@ def get_all_subscribers() -> list:
         return [u._asdict() for u in users]
     return _rows_to_dicts(cursor, users)
 
-def get_users_by_time(time: str) -> list:
+def get_users_by_time(time_str: str, window_minutes: int = 15) -> list:
+    """Get subscribed users whose preferred_time falls within [time - window, time].
+    Uses string comparison which works for HH:MM format."""
     conn = get_db_connection()
     if not conn:
         return []
-    
+
     cursor = conn.cursor()
-    
-    if USE_POSTGRES:
-        cursor.execute("SELECT * FROM users WHERE preferred_time = %s AND is_subscribed = TRUE", (time,))
+
+    if window_minutes > 0:
+        # Compute start of window by subtracting window_minutes from current time
+        from datetime import datetime, timedelta
+        now = datetime.strptime(time_str, "%H:%M")
+        start = (now - timedelta(minutes=window_minutes)).strftime("%H:%M")
+        end = time_str
+
+        if start <= end:
+            # Normal case: window doesn't cross midnight
+            if USE_POSTGRES:
+                cursor.execute(
+                    "SELECT * FROM users WHERE preferred_time > %s AND preferred_time <= %s AND is_subscribed = TRUE",
+                    (start, end))
+            else:
+                cursor.execute(
+                    "SELECT * FROM users WHERE preferred_time > ? AND preferred_time <= ? AND is_subscribed = 1",
+                    (start, end))
+        else:
+            # Window crosses midnight (unlikely with 11:00-23:00 range, but handle it)
+            if USE_POSTGRES:
+                cursor.execute(
+                    "SELECT * FROM users WHERE (preferred_time > %s OR preferred_time <= %s) AND is_subscribed = TRUE",
+                    (start, end))
+            else:
+                cursor.execute(
+                    "SELECT * FROM users WHERE (preferred_time > ? OR preferred_time <= ?) AND is_subscribed = 1",
+                    (start, end))
     else:
-        cursor.execute("SELECT * FROM users WHERE preferred_time = ? AND is_subscribed = 1", (time,))
-    
+        # Exact match (legacy behavior)
+        if USE_POSTGRES:
+            cursor.execute("SELECT * FROM users WHERE preferred_time = %s AND is_subscribed = TRUE", (time_str,))
+        else:
+            cursor.execute("SELECT * FROM users WHERE preferred_time = ? AND is_subscribed = 1", (time_str,))
+
+    columns = [desc[0] for desc in cursor.description] if cursor.description else []
     users = cursor.fetchall()
     conn.close()
-    
-    if not users:
+
+    if not users or not columns:
         return []
-    if hasattr(users[0], '_asdict'):
-        return [u._asdict() for u in users]
-    return _rows_to_dicts(cursor, users)
+    return [dict(zip(columns, row)) for row in users]
 
 def update_preferred_time(user_id: int, preferred_time: str) -> bool:
     conn = get_db_connection()
