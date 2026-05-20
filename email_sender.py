@@ -11,9 +11,9 @@ import urllib.error
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Gmail SMTP Configuration
-GMAIL_USER = os.environ.get("GMAIL_USER", "")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+# Gmail SMTP Configuration (strip quotes that Render might add)
+GMAIL_USER = os.environ.get("GMAIL_USER", "").strip('"').strip("'")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip('"').strip("'")
 
 # Brevo API Configuration (fallback)
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
@@ -24,6 +24,7 @@ SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "VocabPro")
 def _send_via_gmail(to_email: str, subject: str, html_content: str) -> bool:
     """Send email via Gmail SMTP"""
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print(f"Gmail SMTP not configured: user={bool(GMAIL_USER)}, pass={bool(GMAIL_APP_PASSWORD)}")
         return False
 
     msg = MIMEMultipart("alternative")
@@ -33,13 +34,14 @@ def _send_via_gmail(to_email: str, subject: str, html_content: str) -> bool:
     msg.attach(MIMEText(html_content, "html"))
 
     try:
+        print(f"Connecting to Gmail SMTP for {to_email}...")
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
             server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
             server.sendmail(GMAIL_USER, to_email, msg.as_string())
         print(f"Email sent to {to_email} (Gmail SMTP)")
         return True
     except Exception as e:
-        print(f"Gmail SMTP error to {to_email}: {e}")
+        print(f"Gmail SMTP error to {to_email}: {type(e).__name__}: {e}")
         return False
 
 

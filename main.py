@@ -16,7 +16,7 @@ import schedule
 import time
 import threading
 import requests as _requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -468,19 +468,16 @@ async def debug_email():
     import os
     gmail_user = os.environ.get("GMAIL_USER", "")
     gmail_pass = os.environ.get("GMAIL_APP_PASSWORD", "")
-    brevo_key = os.environ.get("BREVO_API_KEY", "")
-    brevo_sender = os.environ.get("BREVO_SENDER_EMAIL", "")
     return {
         "gmail_user_set": bool(gmail_user),
-        "gmail_user_value": gmail_user[:5] + "***" if gmail_user else "",
+        "gmail_user_raw": repr(gmail_user),
         "gmail_pass_set": bool(gmail_pass),
-        "gmail_pass_length": len(gmail_pass),
-        "brevo_key_set": bool(brevo_key),
-        "brevo_sender_set": bool(brevo_sender),
-        "current_time": datetime.now().strftime("%H:%M"),
-        "email_sender_module": "loaded" if email_sender else "not loaded",
-        "GMAIL_USER_attr": bool(email_sender.GMAIL_USER),
-        "GMAIL_PASS_attr": bool(email_sender.GMAIL_APP_PASSWORD),
+        "gmail_pass_raw_length": len(gmail_pass),
+        "gmail_pass_starts_with_quote": gmail_pass.startswith('"') if gmail_pass else False,
+        "gmail_pass_ends_with_quote": gmail_pass.endswith('"') if gmail_pass else False,
+        "gmail_user_in_module": repr(email_sender.GMAIL_USER),
+        "gmail_pass_in_module_length": len(email_sender.GMAIL_APP_PASSWORD),
+        "current_bd_time": datetime.now(timezone(timedelta(hours=6))).strftime("%H:%M"),
     }
 
 @app.get("/logout")
