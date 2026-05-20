@@ -850,23 +850,31 @@ async def broadcast(data: dict, _: bool = Depends(require_admin_session)):
 
 @app.post("/api/admin/generate-vocabulary")
 async def generate_vocabulary(data: dict, _: bool = Depends(require_admin_session)):
-    """Generate vocabulary using OpenRouter AI and save to database"""
+    """Generate vocabulary using OpenRouter AI — runs in background to avoid worker timeout"""
     try:
         count = data.get("count", 50)
         category = data.get("category", None)
+        cat_label = f" ({category})" if category else ""
 
-        result = whatsapp_bot.generate_vocabulary(count, category)
+        def _generate():
+            try:
+                result = whatsapp_bot.generate_vocabulary(count, category)
+                if result.get("success"):
+                    print(f"Background generation complete: {result.get('generated')} {cat_label} words, saved {result.get('saved')}")
+                else:
+                    print(f"Background generation failed: {result.get('error')}")
+            except Exception as e:
+                print(f"Background generation error: {e}")
 
-        if result.get("success"):
-            cat_label = f" ({category})" if category else ""
-            return {
-                "status": "success",
-                "message": f"Generated {result.get('generated')}{cat_label} words, saved {result.get('saved')} to database",
-                "generated": result.get("generated"),
-                "saved": result.get("saved")
-            }
-        else:
-            return {"status": "error", "message": result.get("error", "Unknown error")}
+        thread = threading.Thread(target=_generate, daemon=True)
+        thread.start()
+
+        return {
+            "status": "success",
+            "message": f"Generating {count}{cat_label} words in background... Check vocabulary list in ~2 minutes.",
+            "generated": 0,
+            "saved": 0
+        }
     except Exception as e:
         print(f"Generate vocabulary error: {e}")
         return {"status": "error", "message": str(e)}
