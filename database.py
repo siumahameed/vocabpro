@@ -226,6 +226,18 @@ def init_db():
     except Exception as e:
         print(f"Migration note (streak/activity columns): {e}")
 
+    # One-time reset: clear last_word_sent_date so users get words via new Gmail SMTP
+    # (previous Brevo sends returned 200 but emails were blocked by freemail domain restriction)
+    try:
+        if USE_POSTGRES:
+            cursor.execute("UPDATE users SET last_word_sent_date = NULL WHERE last_word_sent_date = CURRENT_DATE")
+        else:
+            cursor.execute("UPDATE users SET last_word_sent_date = NULL WHERE last_word_sent_date = date('now')")
+        conn.commit()
+        print("Reset last_word_sent_date for re-delivery via Gmail SMTP")
+    except Exception as e:
+        print(f"Migration note (reset sent date): {e}")
+
     # Migration: fix users with old default preferred_time '09:30' (outside allowed 11:00-23:00 range)
     try:
         if USE_POSTGRES:
