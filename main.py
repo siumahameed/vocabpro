@@ -300,9 +300,9 @@ async def update_profile(data: dict, user: dict = Depends(require_auth)):
 
     # Validate preferred_time is within allowed range
     import re
-    if re.match(r'^(?:[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$', preferred_time):
+    if re.match(r'^(?:[01]?[0-9]|2[0-3]):[0-5][0-9]$', preferred_time):
         hour = int(preferred_time.split(':')[0])
-        if hour < 11 or hour >= 23:
+        if hour < 6 or hour > 23:
             preferred_time = "12:00"  # fallback to default if out of range
     else:
         preferred_time = "12:00"  # fallback if invalid format
@@ -664,9 +664,9 @@ async def submit_payment(payment: PaymentSubmit, user: dict = Depends(require_au
 @app.post("/api/update-time")
 async def update_preferred_time(data: TimeUpdate, user: dict = Depends(require_auth)):
     """Update user's preferred message time"""
-    # Validate time format (HH:MM — accepts leading zero from HTML input)
+    # Validate time format (HH:MM — accepts leading zero from HTML input like 09:00)
     import re
-    if not re.match(r'^(?:[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$', data.preferred_time):
+    if not re.match(r'^(?:[01]?[0-9]|2[0-3]):[0-5][0-9]$', data.preferred_time):
         return {"status": "error", "message": "Invalid time format"}
     
     hour = int(data.preferred_time.split(':')[0])
