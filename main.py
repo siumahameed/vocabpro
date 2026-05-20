@@ -98,6 +98,10 @@ def _run_scheduler():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
+    # Run once immediately on startup to catch any users whose time already passed
+    print(f"[{datetime.now()}] Running initial vocabulary check on startup...")
+    threading.Thread(target=send_daily_vocabulary, daemon=True).start()
+
     # Start scheduler - runs every 15 minutes to catch custom time preferences
     schedule.every(15).minutes.do(send_daily_vocabulary)
     print("Scheduler started - Checking every 15 minutes for users")
@@ -1639,13 +1643,19 @@ def send_daily_vocabulary():
 
     if email_users:
         print(f"Sending to {len(email_users)} email users...")
-        result = email_sender.send_to_email_subscribers(email_users)
-        print(f"Email result: {result}")
+        try:
+            result = email_sender.send_to_email_subscribers(email_users)
+            print(f"Email result: {result}")
+        except Exception as e:
+            print(f"Email sending error: {e}")
 
     if whatsapp_users:
         print(f"Sending to {len(whatsapp_users)} WhatsApp users...")
-        result = whatsapp_bot.send_to_all_subscribers(whatsapp_users)
-        print(f"WhatsApp result: {result}")
+        try:
+            result = whatsapp_bot.send_to_all_subscribers(whatsapp_users)
+            print(f"WhatsApp result: {result}")
+        except Exception as e:
+            print(f"WhatsApp sending error: {e}")
 
 # ==================== MAIN ====================
 
