@@ -1173,9 +1173,19 @@ async function generateForCategory(category) {
         const data = await response.json();
         if (data.status === 'success') {
             result.className = 'mt-3 p-3 rounded-lg bg-green-100 text-green-700 text-sm';
-            result.innerHTML = `Generated ${data.generated} ${category.toUpperCase()} words, saved ${data.saved}.`;
-            loadCategoryStats();
-            searchVocabulary();
+            if (data.generated > 0) {
+                result.innerHTML = `Generated ${data.generated} ${category.toUpperCase()} words, saved ${data.saved}.`;
+                loadCategoryStats();
+                searchVocabulary();
+            } else {
+                result.innerHTML = data.message || 'Generating in background... Check vocabulary list in ~2 minutes.';
+                // Auto-refresh after 2 minutes
+                setTimeout(() => {
+                    loadCategoryStats();
+                    searchVocabulary();
+                    result.classList.add('hidden');
+                }, 120000);
+            }
         } else {
             result.className = 'mt-3 p-3 rounded-lg bg-red-100 text-red-700 text-sm';
             result.innerHTML = `Error: ${data.message}`;
