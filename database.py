@@ -226,18 +226,6 @@ def init_db():
     except Exception as e:
         print(f"Migration note (streak/activity columns): {e}")
 
-    # One-time reset: clear last_word_sent_date so users get words via new Gmail SMTP
-    # (previous Brevo sends returned 200 but emails were blocked by freemail domain restriction)
-    try:
-        if USE_POSTGRES:
-            cursor.execute("UPDATE users SET last_word_sent_date = NULL")
-        else:
-            cursor.execute("UPDATE users SET last_word_sent_date = NULL")
-        conn.commit()
-        print("Reset last_word_sent_date for re-delivery via Gmail SMTP")
-    except Exception as e:
-        print(f"Migration note (reset sent date): {e}")
-
     # Migration: fix users with old default preferred_time '09:30' (outside allowed 11:00-23:00 range)
     try:
         if USE_POSTGRES:
@@ -676,22 +664,22 @@ def get_users_needing_words(current_time: str) -> list:
 
     # Find users where:
     # 1. is_subscribed = TRUE
-    # 2. Either NEVER received words (send now!) OR preferred_time has passed today
-    # 3. Haven't received words today
+    # 2. preferred_time has passed today (respects user's chosen time)
+    # 3. Haven't received words today (prevents duplicates)
     if USE_POSTGRES:
         cursor.execute("""
             SELECT * FROM users
             WHERE is_subscribed = TRUE
+              AND preferred_time <= %s
               AND (last_word_sent_date IS NULL OR last_word_sent_date < %s)
-              AND (last_word_sent_date IS NULL OR preferred_time <= %s)
-        """, (today, current_time))
+        """, (current_time, today))
     else:
         cursor.execute("""
             SELECT * FROM users
             WHERE is_subscribed = 1
+              AND preferred_time <= ?
               AND (last_word_sent_date IS NULL OR last_word_sent_date < ?)
-              AND (last_word_sent_date IS NULL OR preferred_time <= ?)
-        """, (today, current_time))
+        """, (current_time, today))
 
     columns = [desc[0] for desc in cursor.description] if cursor.description else []
     users = cursor.fetchall()
