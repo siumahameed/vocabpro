@@ -480,6 +480,30 @@ async def debug_email():
         "current_bd_time": datetime.now(timezone(timedelta(hours=6))).strftime("%H:%M"),
     }
 
+
+@app.get("/delivery-status")
+async def delivery_status():
+    """Check which users received words and when"""
+    conn = database.get_db_connection()
+    if not conn:
+        return {"error": "Database connection failed"}
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, name, email, preferred_time, last_word_sent_date,
+                   last_word_index, words_learned, is_subscribed, delivery_channel
+            FROM users ORDER BY id
+        """)
+        columns = [desc[0] for desc in cursor.description]
+        users = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return {"users": users, "count": len(users)}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @app.get("/logout")
 async def logout(request: Request):
     """Logout"""
