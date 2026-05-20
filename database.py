@@ -662,36 +662,36 @@ def get_users_by_time(time_str: str, window_minutes: int = 15) -> list:
 
 
 def get_users_needing_words(current_time: str) -> list:
-    """Get subscribed users whose preferred_time has passed today and haven't received words yet.
-    This is robust against app sleep/restart — it catches ALL users who were missed."""
+    """Get subscribed users who haven't received words today.
+    Sends immediately to users who NEVER received words (first time).
+    For users who received before, waits until their preferred_time passes."""
     conn = get_db_connection()
     if not conn:
         return []
 
     cursor = conn.cursor()
     # Use Bangladesh time (UTC+6) for date comparison since users set preferred_time in BD time
-    from datetime import timezone
     bd_now = datetime.now(timezone(timedelta(hours=6)))
     today = bd_now.date().isoformat()
 
     # Find users where:
     # 1. is_subscribed = TRUE
-    # 2. preferred_time <= current_time (their scheduled time has passed)
-    # 3. last_word_sent_date IS NULL OR last_word_sent_date < today (haven't received words today)
+    # 2. Either NEVER received words (send now!) OR preferred_time has passed today
+    # 3. Haven't received words today
     if USE_POSTGRES:
         cursor.execute("""
             SELECT * FROM users
             WHERE is_subscribed = TRUE
-              AND preferred_time <= %s
               AND (last_word_sent_date IS NULL OR last_word_sent_date < %s)
-        """, (current_time, today))
+              AND (last_word_sent_date IS NULL OR preferred_time <= %s)
+        """, (today, current_time))
     else:
         cursor.execute("""
             SELECT * FROM users
             WHERE is_subscribed = 1
-              AND preferred_time <= ?
               AND (last_word_sent_date IS NULL OR last_word_sent_date < ?)
-        """, (current_time, today))
+              AND (last_word_sent_date IS NULL OR preferred_time <= ?)
+        """, (today, current_time))
 
     columns = [desc[0] for desc in cursor.description] if cursor.description else []
     users = cursor.fetchall()
