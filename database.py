@@ -207,6 +207,25 @@ def init_db():
     except Exception as e:
         print(f"Migration note (last_word_sent_date): {e}")
 
+    # Migration: add streak/activity tracking columns
+    try:
+        if USE_POSTGRES:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_days INTEGER DEFAULT 0")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_date DATE")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS total_words_sent INTEGER DEFAULT 0")
+        else:
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'streak_days' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN streak_days INTEGER DEFAULT 0")
+            if 'last_active_date' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN last_active_date DATE")
+            if 'total_words_sent' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN total_words_sent INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception as e:
+        print(f"Migration note (streak/activity columns): {e}")
+
     # Migration: fix users with old default preferred_time '09:30' (outside allowed 11:00-23:00 range)
     try:
         if USE_POSTGRES:
