@@ -1101,8 +1101,12 @@ async function deleteWord(wordId, word) {
         });
         const data = await response.json();
         if (data.status === 'success') {
-            alert('Word deleted');
-            location.reload();
+            // Remove row in-place instead of full page reload
+            const row = document.querySelector(`tr[data-word-id="${wordId}"]`);
+            if (row) {
+                row.classList.add('bg-red-50');
+                setTimeout(() => row.remove(), 300);
+            }
         } else {
             alert('Error: ' + data.message);
         }
